@@ -45,6 +45,7 @@ tools:
     args: [-m, lab.mcp_server]
     env:
       IONFORGE_RUN_ID: "__RUN_ID__"
+      IONFORGE_AGENT: "pi"   # who is calling, for the live campaign map
       IONFORGE_TASK: "__TASK__"
       IONFORGE_BUDGET: "__BUDGET__"
       IONFORGE_SEED: "__SEED__"

@@ -10,17 +10,21 @@ Environment:
   IONFORGE_SEED       seed                           (default 0)
   IONFORGE_ANONYMIZE  1 = Ablation 2: hide formulas and families from agents
   IONFORGE_STRATEGY   runs.strategy in Supabase: ionforge | ablation_no_lit | ablation_anon
+  IONFORGE_AGENT      which agent owns this server process (live campaign map only)
 
 Never print to stdout here: it is the MCP protocol channel.
 """
 from __future__ import annotations
 
+import functools
 import json
 import os
+import threading
 
 import numpy as np
 from mcp.server.mcpserver import MCPServer
 
+from lab import sync
 from lab.features import anonymized_descriptor_view
 from lab.oracle import BudgetExceeded, Oracle
 from lab.surrogate import Surrogate
@@ -35,10 +39,49 @@ ANON = os.environ.get("IONFORGE_ANONYMIZE", "0") == "1"
 STRATEGY = os.environ.get("IONFORGE_STRATEGY", "ionforge")
 DESIGNS = ("exploit", "explore", "hypothesis_test")
 MAX_BATCH = 5
+AGENT = os.environ.get("IONFORGE_AGENT", "agent")
+
+# What each read-only tool call means, in words a judge understands (live campaign map).
+ACTIONS = {
+    "lab_status": "Checking budget and progress",
+    "family_overview": "Reviewing the structural families in the pool",
+    "list_candidates": "Filtering candidate materials",
+    "surrogate_rank": "Ranking candidates with the uncertainty-aware surrogate",
+    "evaluate_designs": "Scoring the exploit / explore / test-hypothesis designs",
+    "measurements": "Reading past measurements",
+    "research_record": "Reading the research record",
+}
 
 
 def _lab() -> Oracle:
     return Oracle(TASK, budget=BUDGET, seed=SEED, run_id=RUN_ID, strategy=STRATEGY)
+
+
+def _activity(state: str, action: str, tool: str, detail: dict | None = None,
+              after_measure: bool | None = None) -> None:
+    """Log one agent action for the live map, off the request path (never slows the agent)."""
+    if not sync.enabled():
+        return
+
+    def send() -> None:
+        try:
+            done = _lab().round
+            # same numbering as Oracle.log_event: the Critic reviews the round just measured
+            rnd = done if (after_measure if after_measure is not None else AGENT == "critic") else done + 1
+        except Exception:
+            rnd = None
+        sync.activity(RUN_ID, AGENT, state, action, tool, rnd, detail)
+
+    threading.Thread(target=send, daemon=True).start()
+
+
+def _tracked(fn):
+    """Mark read-only tools as 'working' on the live map."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        _activity("working", ACTIONS.get(fn.__name__, fn.__name__), fn.__name__)
+        return fn(*args, **kwargs)
+    return wrapper
 
 
 def _public_rows(lab: Oracle, ids: list[str]) -> list[dict]:
@@ -52,6 +95,7 @@ def _public_rows(lab: Oracle, ids: list[str]) -> list[dict]:
 
 
 @mcp.tool()
+@_tracked
 def lab_status() -> dict:
     """Budget, progress and the scientific objective of the current campaign."""
     lab = _lab()
@@ -73,6 +117,7 @@ def lab_status() -> dict:
 
 
 @mcp.tool()
+@_tracked
 def family_overview() -> list[dict]:
     """Per chemical family: pool size, how many measured, hits found, best log10(sigma) seen."""
     lab = _lab()
@@ -93,6 +138,7 @@ def family_overview() -> list[dict]:
 
 
 @mcp.tool()
+@_tracked
 def list_candidates(family: str | None = None, contains_element: str | None = None,
                     unmeasured_only: bool = True, limit: int = 40) -> list[dict]:
     """Browse candidates (never their conductivity). Filter by family or by an element symbol."""
@@ -108,6 +154,7 @@ def list_candidates(family: str | None = None, contains_element: str | None = No
 
 
 @mcp.tool()
+@_tracked
 def measurements(last_n: int = 50) -> list[dict]:
     """Results measured so far in this campaign (the only revealed conductivities)."""
     lab = _lab()
@@ -123,6 +170,7 @@ def measurements(last_n: int = 50) -> list[dict]:
 
 
 @mcp.tool()
+@_tracked
 def surrogate_rank(top: int = 20, beta: float = 1.0, family: str | None = None) -> list[dict]:
     """Fit a random-forest surrogate on measured data; rank unmeasured candidates.
 
@@ -147,6 +195,7 @@ def surrogate_rank(top: int = 20, beta: float = 1.0, family: str | None = None) 
 
 
 @mcp.tool()
+@_tracked
 def evaluate_designs(designs: list[dict]) -> list[dict]:
     """Score competing experiment designs before spending budget.
 
@@ -192,6 +241,8 @@ def measure(candidate_ids: list[str], requested_by: str, rationale: str,
         return {"error": f"max {MAX_BATCH} candidates per round"}
     if design is not None and design not in DESIGNS:
         return {"error": f"design must be one of {DESIGNS}"}
+    _activity("working", f"Running {len(candidate_ids)} lab measurements ({design or 'design n/a'})", "measure",
+              {"candidates": candidate_ids, "design": design}, after_measure=False)
     lab = _lab()
     try:
         res = lab.measure(candidate_ids, requested_by=requested_by, rationale=rationale,
@@ -204,6 +255,9 @@ def measure(candidate_ids: list[str], requested_by: str, rationale: str,
         if not ANON:
             r.update(composition=m.composition, family=m.family)
         results.append(r)
+    hits = sum(m.is_hit for m in res)
+    _activity("done", f"Measured {len(res)} materials: {hits} hit(s), {lab.remaining:.0f} measurements left",
+              "measure", {"hits": hits, "budget_remaining": lab.remaining}, after_measure=True)
     return {"round": lab.round, "results": results, "hits_found_total": lab.n_hits(),
             "distinct_families_found": len(lab.families_found()), "budget_remaining": lab.remaining}
 
@@ -222,10 +276,23 @@ def record_decision(kind: str, author: str, payload: dict) -> dict:
         return {"error": "payload must be a non-empty object; record nothing if there is nothing to record"}
     lab = _lab()
     lab.log_event(kind, author=author, payload=payload)
+    _activity("done", _recorded(kind, payload), "record_decision", {"kind": kind},
+              after_measure=kind in ("review", "next_step"))
     return {"ok": True, "run_id": lab.run_id}
 
 
+def _recorded(kind: str, payload: dict) -> str:
+    """One readable line for the live map, e.g. 'Proposed H2: Lu substitution ...'."""
+    text = (payload.get("statement") or payload.get("trend") or payload.get("summary")
+            or payload.get("rationale") or payload.get("next_experiment") or "")
+    label = {"evidence": "Added evidence", "hypothesis": f"Proposed {payload.get('id', 'a hypothesis')}",
+             "candidate_set": "Shortlisted candidates", "experiment_spec": f"Chose the {payload.get('design') or payload.get('chosen') or ''} design",
+             "review": f"Review: {payload.get('verdict') or 'recorded'}", "next_step": "Next step"}.get(kind, kind)
+    return f"{label}: {str(text)[:160]}" if text else label
+
+
 @mcp.tool()
+@_tracked
 def research_record(kinds: list[str] | None = None, last_n: int = 30, round: int | None = None,
                     full: bool = False) -> list[dict]:
     """Read the shared research record: evidence, hypotheses, candidate sets, experiment
