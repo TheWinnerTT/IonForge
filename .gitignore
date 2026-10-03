@@ -13,3 +13,4 @@ results/runs/*.jsonl
 agents/build/
 *.egg-info/
 .omnigent/
+results/logs/

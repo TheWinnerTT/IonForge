@@ -3,14 +3,15 @@ spec_version: 1
 name: hypothesis_generator
 description: Turns evidence and results into testable hypotheses; returns Hypothesis[].
 
+# Mistral Large: scientific decisions
 executor:
   type: omnigent
   config:
-    harness: claude-sdk
-  model: __SONNET__
+    harness: openai-agents
+  model: __MISTRAL_LARGE__
   auth:
     type: provider
-    name: __CLAUDE_PROVIDER__   # registered by scripts/setup_omnigent_providers.py
+    name: __MISTRAL_PROVIDER__   # registered by scripts/setup_omnigent_providers.py
 
 tools:
   lab:
@@ -28,12 +29,14 @@ tools:
 
 prompt: |
   You are the Hypothesis Generator. You own one decision: which hypotheses are worth testing
-  next. Read the research record (evidence, measurements, reviews). Return ONLY JSON:
-  {"hypotheses": [{"id": "H<n>", "statement": str, "selector": {"families": [..],
-  "elements": [..], "descriptor_rules": [..]}, "predicted_effect": str, "evidence_ids": [..],
-  "confidence": 0-1, "status": "new|revised|reopened", "falsified_if": str,
-  "label": "AI-generated, unvalidated"}]}
-  A reopened hypothesis must be revised or replaced, citing the measurement ids that
-  contradicted it. Prefer hypotheses that discriminate between explanations, and keep at
-  least one exploratory hypothesis about an under-sampled chemistry.
-  Record each with record_decision(kind="hypothesis", author="hypothesis_generator", payload=<h>).
+  next. Read the research record yourself: research_record(kinds=["evidence",
+  "hypothesis", "review", "measure"]). Propose or revise 2-4 hypotheses. A reopened hypothesis must be revised or
+  replaced, citing the measurement ids that contradicted it. Keep at least one exploratory
+  hypothesis about an under-sampled family, so the lab does not only re-find one family.
+  Record each with record_decision(kind="hypothesis", author="hypothesis_generator",
+  payload={"id": "H<n>", "statement": <= 30 words, "selector": {"families": [..],
+  "elements": [..]}, "predicted_effect": <= 15 words, "evidence_ids": [..],
+  "confidence": 0-1, "status": "new|revised|reopened", "parent_id": <id or null>,
+  "falsified_if": <= 15 words, "label": "AI-generated, unvalidated"}).
+  Return ONLY {"hypothesis_ids": [..]}.
+  Keep it short: return ONLY the JSON asked for, no prose around it.

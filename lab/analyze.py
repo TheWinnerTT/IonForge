@@ -7,7 +7,7 @@ results/baselines_<task>.json on the same task:
     = median(baseline) / median(strategy), with a bootstrap 90% interval;
   * targets found and distinct families found within the 50-measurement budget.
 
-Live demo runs (run ids containing "-live-") are excluded from the statistics.
+Live demo and smoke-test runs (run ids containing "-live-" / "-smoke-") are excluded.
 
     python -m lab.analyze --task main
 """
@@ -37,7 +37,7 @@ def load_campaigns(task: str, include_live: bool = False) -> dict[str, list[dict
         start = next((e for e in events if e.get("event") == "run_start"), None)
         if not start or start.get("task") != task:
             continue
-        if "-live-" in start["run_id"] and not include_live:
+        if ("-live-" in start["run_id"] or "-smoke-" in start["run_id"]) and not include_live:
             continue
         results = [r for e in events if e.get("event") == "measure" for r in e["results"]]
         by_strategy[start.get("strategy", "ionforge")].append({

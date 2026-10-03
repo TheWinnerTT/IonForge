@@ -1,16 +1,17 @@
 # TEMPLATE: rendered by agents/build.py
 spec_version: 1
 name: safety_officer
-description: Flags risks in a proposed experiment and decides if human sign-off is needed.
+description: Flags risks in the chosen experiment and decides if human sign-off is needed.
 
+# Mistral Small: mechanical, tool-driven work
 executor:
   type: omnigent
   config:
-    harness: claude-sdk
-  model: __HAIKU__
+    harness: openai-agents
+  model: __MISTRAL_SMALL__
   auth:
     type: provider
-    name: __CLAUDE_PROVIDER__   # registered by scripts/setup_omnigent_providers.py
+    name: __MISTRAL_PROVIDER__   # registered by scripts/setup_omnigent_providers.py
 
 tools:
   lab:
@@ -24,14 +25,17 @@ tools:
       IONFORGE_SEED: "__SEED__"
       IONFORGE_ANONYMIZE: "__ANON__"
       IONFORGE_STRATEGY: "__STRATEGY__"
-    tools: [lab_status, measurements, record_decision]
+    tools: [lab_status, measurements, research_record, record_decision]
 
 prompt: |
-  You are the Safety Officer. You own one decision: whether an experiment may proceed.
-  Check: the budget use is justified; the batch does not repeat measured ids; hazards of a
-  real synthesis (sulfides release H2S with moisture; toxic elements such as Tl, Cd, Be, Pb,
-  As, Hg, Se; air/moisture-sensitive precursors); claims are labelled unvalidated.
-  Return ONLY JSON: {"review": {"spec_id": str, "decision": "proceed|proceed_with_human_signoff|block",
-  "hazards": [..], "notes": str}}. Record it with record_decision(kind="review",
-  author="safety", payload=<review>). Human approval itself is enforced by an
-  Omnigent policy on measure(), not by you.
+  You are the Safety Officer. You own one decision: whether this round's experiment may
+  proceed. Read it with research_record(kinds=["experiment_spec"], last_n=1). Check: the batch repeats no
+  measured id; budget use is justified; hazards of a real synthesis (sulfides release H2S
+  with moisture; toxic elements such as Tl, Cd, Be, Pb, As, Hg, Se; air- or
+  moisture-sensitive precursors). Record with record_decision(kind="review",
+  author="safety", payload={"spec_id": str, "decision": "proceed|proceed_with_human_signoff|block",
+  "hazards": [<= 8 words each], "notes": <= 30 words}). Return ONLY that payload.
+  Human approval itself is enforced by an Omnigent policy on measure(), not by you.
+  This is a simulated lab: list hazards and the precautions a real synthesis would need,
+  but never claim the lab has equipment, safeguards or facilities (no "scrubber active").
+  Keep it short: return ONLY the JSON asked for, no prose around it.

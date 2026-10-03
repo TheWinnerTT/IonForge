@@ -4,24 +4,34 @@
     python agents/build.py --variant bench --seed 3       # overnight campaign, seed 3
     python agents/build.py --variant all --task main
 
-Output: agents/build/<run_id>/ (a directory bundle), run with
-    omnigent run agents/build/<run_id>
+Output: agents/build/<run_id>/ (a directory bundle). One `omnigent run` of a bundle is one
+round of the discovery loop; scripts/run_campaign.py runs the rounds of a campaign.
 
 Variants (strategy = `runs.strategy` in supabase/schema.sql)
   live            ionforge         human approval on WhatsApp / dashboard before every measurement
+  smoke           ionforge         end-to-end test: demo keys, approval auto-granted and logged,
+                                   budget 10 measurements = 2 rounds (excluded from all statistics)
   bench           ionforge         approval auto-granted and logged: overnight campaigns
   ablation_nolit  ablation_no_lit  bench without the literature tools (Ablation 1)
   ablation_anon   ablation_anon    bench with formulas and families hidden (Ablation 2)
 
 Bench run ids are deterministic (<strategy>-<task>-s<seed>), so an interrupted
-campaign resumes from its research record. Live run ids carry a timestamp, so each
-rehearsal starts a fresh lab. Models can be overridden in .env.
+campaign resumes from its research record. Live and smoke run ids carry a timestamp,
+so each rehearsal starts a fresh lab.
 
-Credentials (no key is ever written into a bundle): every agent authenticates through
-an Omnigent provider registered by scripts/setup_omnigent_providers.py.
-  LLM_ROUTE=openrouter (default)  live -> openrouter_demo (OPENROUTER_API_KEY)
-                                  bench / ablations -> openrouter_campaigns (OPENROUTER_API_KEY_CAMPAIGNS)
-  LLM_ROUTE=anthropic             Claude agents -> anthropic_direct (ANTHROPIC_API_KEY); Critic stays on OpenRouter
+Models (override in .env): Mistral is the lab's engine; the Critic is Claude through
+OpenRouter, a different family from the Mistral Hypothesis Generator.
+  PI, Hypothesis Generator, Experiment Planner   MISTRAL_LARGE_MODEL  (mistral-large-latest)
+  Screening, Safety Officer, Literature Scouts   MISTRAL_SMALL_MODEL  (mistral-small-latest)
+  Critic                                         CRITIC_MODEL         (anthropic/claude-sonnet-5.5)
+  PI_ENGINE=claude moves only the PI to Claude Sonnet on OpenRouter (fallback if a
+  Mistral PI does not coordinate well).
+
+Credentials (no key is ever written into a bundle): every agent authenticates through an
+Omnigent provider registered by scripts/setup_omnigent_providers.py.
+  live / smoke       mistral_demo (MISTRAL_API_KEY) + openrouter_demo (OPENROUTER_API_KEY)
+  bench / ablations  mistral_campaigns (MISTRAL_API_KEY_CAMPAIGNS)
+                     + openrouter_campaigns (OPENROUTER_API_KEY_CAMPAIGNS)
 Rendering only checks that the needed variables are set; it never calls an API.
 """
 from __future__ import annotations
@@ -40,61 +50,68 @@ TEMPLATE = ROOT / "agents" / "template"
 OUT = ROOT / "agents" / "build"
 load_dotenv(ROOT / ".env")
 
-ROUTE = os.getenv("LLM_ROUTE", "openrouter")
-CLAUDE_MODELS = {
-    "openrouter": {"__SONNET__": "anthropic/claude-sonnet-5.5", "__HAIKU__": "anthropic/claude-haiku-4.5"},
-    "anthropic": {"__SONNET__": "claude-sonnet-5-5", "__HAIKU__": "claude-haiku-4-5"},
-}
-MODELS = {
-    "__SONNET__": os.getenv("SONNET_MODEL") or CLAUDE_MODELS[ROUTE]["__SONNET__"],
-    "__HAIKU__": os.getenv("HAIKU_MODEL") or CLAUDE_MODELS[ROUTE]["__HAIKU__"],
-    "__CRITIC_MODEL__": os.getenv("CRITIC_MODEL", "google/gemini-3.8-flash"),  # OpenRouter, non-Anthropic
-    "__MISTRAL_MODEL__": os.getenv("MISTRAL_SCOUT_MODEL", "mistral-small-latest"),
-}
+MISTRAL_LARGE = os.getenv("MISTRAL_LARGE_MODEL", "mistral-large-latest")
+MISTRAL_SMALL = os.getenv("MISTRAL_SMALL_MODEL", "mistral-small-latest")
+CRITIC_MODEL = os.getenv("CRITIC_MODEL", "anthropic/claude-sonnet-5.5")
+PI_ENGINE = os.getenv("PI_ENGINE", "mistral")
+CLAUDE_PI_MODEL = os.getenv("CLAUDE_PI_MODEL", "anthropic/claude-sonnet-5.5")
+
 # provider name -> environment variable holding its key
 PROVIDER_KEYS = {
+    "mistral_demo": "MISTRAL_API_KEY",
+    "mistral_campaigns": "MISTRAL_API_KEY_CAMPAIGNS",
     "openrouter_demo": "OPENROUTER_API_KEY",
     "openrouter_campaigns": "OPENROUTER_API_KEY_CAMPAIGNS",
-    "anthropic_direct": "ANTHROPIC_API_KEY",
-    "mistral": "MISTRAL_API_KEY",
+}
+
+VARIANTS = {
+    "live": {"strategy": "ionforge", "approval": "whatsapp", "anon": "0", "literature": True, "keys": "demo"},
+    "smoke": {"strategy": "ionforge", "approval": "never", "anon": "0", "literature": True, "keys": "demo"},
+    "bench": {"strategy": "ionforge", "approval": "never", "anon": "0", "literature": True, "keys": "campaigns"},
+    "ablation_nolit": {"strategy": "ablation_no_lit", "approval": "never", "anon": "0", "literature": False,
+                       "keys": "campaigns"},
+    "ablation_anon": {"strategy": "ablation_anon", "approval": "never", "anon": "1", "literature": True,
+                      "keys": "campaigns"},
 }
 
 
 def providers_for(variant: str) -> dict[str, str]:
-    openrouter = "openrouter_demo" if variant == "live" else "openrouter_campaigns"
-    claude = "anthropic_direct" if ROUTE == "anthropic" else openrouter
-    return {"__CLAUDE_PROVIDER__": claude, "__CRITIC_PROVIDER__": openrouter}
+    side = VARIANTS[variant]["keys"]
+    mistral, openrouter = f"mistral_{side}", f"openrouter_{side}"
+    pi_on_claude = PI_ENGINE == "claude"
+    return {
+        "__MISTRAL_PROVIDER__": mistral,
+        "__CRITIC_PROVIDER__": openrouter,
+        "__PI_PROVIDER__": openrouter if pi_on_claude else mistral,
+        "__PI_MODEL__": CLAUDE_PI_MODEL if pi_on_claude else MISTRAL_LARGE,
+        # claude-sdk for a Claude PI (tested in the first smoke run); openai-agents for Mistral.
+        "__PI_HARNESS__": "claude-sdk" if pi_on_claude else "openai-agents",
+    }
 
 
 def missing_keys(variant: str) -> list[str]:
-    needed = set(providers_for(variant).values()) | {"mistral"}
-    if not VARIANTS[variant]["literature"]:
-        needed.discard("mistral")
-    return sorted(PROVIDER_KEYS[p] for p in needed if not os.getenv(PROVIDER_KEYS[p]))
-
-VARIANTS = {
-    "live": {"strategy": "ionforge", "approval": "whatsapp", "anon": "0", "literature": True},
-    "bench": {"strategy": "ionforge", "approval": "never", "anon": "0", "literature": True},
-    "ablation_nolit": {"strategy": "ablation_no_lit", "approval": "never", "anon": "0", "literature": False},
-    "ablation_anon": {"strategy": "ablation_anon", "approval": "never", "anon": "1", "literature": True},
-}
+    p = providers_for(variant)
+    needed = {p["__MISTRAL_PROVIDER__"], p["__CRITIC_PROVIDER__"], p["__PI_PROVIDER__"]}
+    return sorted(PROVIDER_KEYS[name] for name in needed if not os.getenv(PROVIDER_KEYS[name]))
 
 
 def run_id_for(variant: str, task: str, seed: int) -> str:
     strategy = VARIANTS[variant]["strategy"]
-    if variant == "live":
-        return f"{strategy}-live-{task}-{time.strftime('%m%d-%H%M%S')}"
+    if variant in ("live", "smoke"):
+        return f"{strategy}-{variant}-{task}-{time.strftime('%m%d-%H%M%S')}"
     return f"{strategy}-{task}-s{seed}"
 
 
 def render(variant: str, task: str, seed: int, budget: int, usd_cap: float) -> Path:
-    if MODELS["__CRITIC_MODEL__"].startswith("anthropic/"):
-        sys.exit("CRITIC_MODEL must be a non-Anthropic model family")
+    if "mistral" in CRITIC_MODEL.lower():
+        sys.exit("CRITIC_MODEL must be a different model family from the Mistral Hypothesis Generator")
     cfg = VARIANTS[variant]
     run_id = run_id_for(variant, task, seed)
     subs = {
-        **MODELS,
         **providers_for(variant),
+        "__MISTRAL_LARGE__": MISTRAL_LARGE,
+        "__MISTRAL_SMALL__": MISTRAL_SMALL,
+        "__CRITIC_MODEL__": CRITIC_MODEL,
         "__STRATEGY__": cfg["strategy"],
         "__APPROVAL__": cfg["approval"],
         "__ANON__": cfg["anon"],
@@ -104,7 +121,6 @@ def render(variant: str, task: str, seed: int, budget: int, usd_cap: float) -> P
         "__BUDGET__": str(budget),
         "__PYTHON__": str(ROOT / ".venv" / "bin" / "python"),
         "__USD_CAP__": f"{usd_cap:.2f}",
-        "__USD_WARN__": f"{usd_cap * 0.7:.2f}",
     }
     dest = OUT / run_id
     if dest.exists():
@@ -139,8 +155,11 @@ def main() -> None:
     ap.add_argument("--task", default="main")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--budget", type=int, default=50)
-    ap.add_argument("--usd-cap", type=float, default=3.0, help="per-session LLM spend cap (USD)")
+    ap.add_argument("--usd-cap", type=float, default=1.5,
+                    help="hard LLM spend cap per round session (USD), enforced by Omnigent")
     args = ap.parse_args()
+    if args.variant == "smoke":
+        args.budget = min(args.budget, 10)
     for v in list(VARIANTS) if args.variant == "all" else [args.variant]:
         missing = missing_keys(v)
         if missing:

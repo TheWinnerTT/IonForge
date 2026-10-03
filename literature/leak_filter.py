@@ -1,7 +1,9 @@
 """No-leak rule: literature may never hand the lab the oracle's answer.
 
 A card is blocked when it mentions a pool composition (exact reduced formula, or a
-doped variant of the same near-duplicate group) AND carries a conductivity value.
+doped variant of the same near-duplicate group) AND carries a conductivity value,
+or when it comes from a paper that is itself a source of the hidden answers: the
+OBELiX dataset paper, or any paper whose DOI is the source of a pool measurement.
 Blocked cards are stored with blocked_leak=true so they can be counted, but they
 are never passed to the Hypothesis Generator.
 """
@@ -43,10 +45,24 @@ def host_system(formula):
     return "-".join(sorted(el.symbol for el, x in comp.items() if x >= MAJOR_FRACTION))
 
 
+# The dataset paper behind the oracle (arXiv 2502.14234, OBELiX).
+DATASET_DOIS = {"10.48550/arxiv.2502.14234"}
+
+
+def norm_doi(doi):
+    return str(doi or "").strip().lower().removeprefix("https://doi.org/")
+
+
 @lru_cache(maxsize=1)
 def pool_index():
     pool = pd.read_csv(POOL_CSV)
     return set(pool["reduced"].dropna()), set(pool["host"].dropna())
+
+
+@lru_cache(maxsize=1)
+def answer_source_dois():
+    """DOIs that report the hidden conductivities: every pool source paper + the dataset paper."""
+    return {norm_doi(d) for d in pd.read_csv(POOL_CSV)["doi"].dropna()} | DATASET_DOIS
 
 
 def mentioned_compositions(card):
@@ -57,6 +73,10 @@ def mentioned_compositions(card):
 
 
 def leak_filter(card):
+    if norm_doi(card.get("doi")) in answer_source_dois():
+        card["blocked_leak"] = True
+        card["blocked_reason"] = "source paper of the hidden answers (pool measurement or OBELiX dataset)"
+        return card
     pool_reduced, pool_hosts = pool_index()
     text = f"{card.get('trend', '')} {card.get('quote', '')}"
     hits = []

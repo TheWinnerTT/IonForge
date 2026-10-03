@@ -1,0 +1,447 @@
+[
+  {
+    "id": "6fb2a224c0376d84",
+    "doi": "10.48550/arXiv.2603.28012",
+    "title": "A Comparative Study of Molecular Dynamics Approaches for Simulating Ionic Conductivity in Solid Lithium Electrolytes",
+    "family": "sulfides",
+    "scout": "sulfides",
+    "trend": "Sulfide-based electrolytes with thio-LISICON structures show measurable lithium diffusion in MD simulations, unlike some oxides or nitrides.",
+    "quote": "some materials which are known to exhibit high diffusion experimentally, namely fft (β-Li3N) and rr5 (LiTi2(PO4)3), show little diffusion in our simulations.",
+    "compositions_mentioned": [
+      "fft (β-Li3N)",
+      "rr5 (LiTi2(PO4)3)"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "e52df391dc5955a9",
+    "doi": "10.48550/arXiv.2603.28012",
+    "title": "A Comparative Study of Molecular Dynamics Approaches for Simulating Ionic Conductivity in Solid Lithium Electrolytes",
+    "family": "sulfides",
+    "scout": "sulfides",
+    "trend": "Sulfide-based electrolytes like Li3PS4 exhibit measurable lithium diffusion in MD simulations.",
+    "quote": "joc (Li3PS4) ... show[s] little diffusion in our simulations.",
+    "compositions_mentioned": [
+      "joc (Li3PS4)"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "8a71486e9bcb25d8",
+    "doi": "10.48550/arXiv.2502.14234",
+    "title": "OBELiX: A Curated Dataset of Crystal Structures and Experimentally Measured Ionic Conductivities for Lithium Solid-State Electrolytes",
+    "family": "sulfides",
+    "scout": "sulfides",
+    "trend": "Partial occupancy and disorder in lithium sites are common and important for high conductivity.",
+    "quote": "Partial occupancy is ubiquitously observed in Li-ion SSEs and it plays a crucial role in creating diffusion pathways.",
+    "compositions_mentioned": [],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": true,
+    "blocked_reason": "source paper of the hidden answers (pool measurement or OBELiX dataset)"
+  },
+  {
+    "id": "b4c8e309862654c2",
+    "doi": "10.48550/arXiv.2502.14234",
+    "title": "OBELiX: A Curated Dataset of Crystal Structures and Experimentally Measured Ionic Conductivities for Lithium Solid-State Electrolytes",
+    "family": "sulfides",
+    "scout": "sulfides",
+    "trend": "Disordering and partial occupation of Li sites promotes Li-ion conduction.",
+    "quote": "In this case, the disordering and partial occupation of Li (at the 96h site) promotes the Li-ion conduction.",
+    "compositions_mentioned": [],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": true,
+    "blocked_leak": true,
+    "blocked_reason": "source paper of the hidden answers (pool measurement or OBELiX dataset)"
+  },
+  {
+    "id": "0d0ae6c4b39ea0b0",
+    "doi": "10.48550/arXiv.2502.14234",
+    "title": "OBELiX: A Curated Dataset of Crystal Structures and Experimentally Measured Ionic Conductivities for Lithium Solid-State Electrolytes",
+    "family": "halides",
+    "scout": "sulfides",
+    "trend": "Substitution introducing intrinsic vacancies can enhance conductivity.",
+    "quote": "In the halide structure of Li3InCl6, the substitution of one Li+ with the In3+ cation introduces two intrinsic vacancies, to which is attributed the high σRT of that material.",
+    "compositions_mentioned": [],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": true,
+    "blocked_reason": "source paper of the hidden answers (pool measurement or OBELiX dataset)"
+  },
+  {
+    "id": "d53c7a82f8be4550",
+    "doi": "10.48550/arXiv.2604.10630",
+    "title": "Electrochemical stability and lithium insertion at the Li|Li3OCl solid electrolyte interface",
+    "family": "antiperovskite oxides",
+    "scout": "oxides",
+    "trend": "In Li3OCl antiperovskites, the Li-O layers are closest to the interface and show significant structural distortions due to Coulombic interactions with Li metal.",
+    "quote": "Li-Cl layer is closest to the interface.",
+    "compositions_mentioned": [
+      "Li3OCl"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": true,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "f3dfe960e62c4b75",
+    "doi": "10.48550/arXiv.2604.10630",
+    "title": "Electrochemical stability and lithium insertion at the Li|Li3OCl solid electrolyte interface",
+    "family": "antiperovskite oxides",
+    "scout": "oxides",
+    "trend": "In Li3OCl antiperovskites, the Li-O layers are closest to the interface and show significant structural distortions due to Coulombic interactions with Li metal.",
+    "quote": "The atoms are shifted about 0.60 Å along the transverse +z-direction at the Li2 interface area.",
+    "compositions_mentioned": [
+      "Li3OCl"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": true,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "c7baa28720900a29",
+    "doi": "10.48550/arXiv.2604.10630",
+    "title": "Electrochemical stability and lithium insertion at the Li|Li3OCl solid electrolyte interface",
+    "family": "antiperovskite oxides",
+    "scout": "oxides",
+    "trend": "In Li3OCl antiperovskites, the Li-O layers are closest to the interface and show significant structural distortions due to Coulombic interactions with Li metal.",
+    "quote": "Li atoms in LOC system are shifted 0.20 to 0.26 Å along +z-direction due to the significant repulsion between Li-Li atoms from LOC and Li2 system.",
+    "compositions_mentioned": [
+      "Li3OCl"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": true,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "5d91c304ea92e994",
+    "doi": "10.48550/arXiv.2608.04690",
+    "title": "Raman Signatures of Lithium Ion Dynamics in LLZO Garnet Electrolytes: Atomistic Insights from MD-Raman Calculations",
+    "family": "LLZO garnets",
+    "scout": "oxides",
+    "trend": "In the cubic phase, merging of octahedral Li sites broadens Li-related Raman peaks, reducing distinct mid-frequency features.",
+    "quote": "the two octahedral sites of t-LLZO, Li(2) (16f) and Li(3) (32g), merge into the partially occupied octahedral Li(2) (96h), over which Li is disordered and mobile.",
+    "compositions_mentioned": [
+      "t-LLZO",
+      "c-LLZO",
+      "Ta-LLZO"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": true,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "3a3f439b74f2ad35",
+    "doi": "10.48550/arXiv.2608.04690",
+    "title": "Raman Signatures of Lithium Ion Dynamics in LLZO Garnet Electrolytes: Atomistic Insights from MD-Raman Calculations",
+    "family": "LLZO garnets",
+    "scout": "oxides",
+    "trend": "The 420 cm⁻¹ Raman feature is a distinctive marker of the non-conductive tetragonal phase, as it shifts upward and merges with higher-frequency bands in the cubic phases.",
+    "quote": "The 420 cm⁻¹ feature is a distinctive marker of the non-conductive tetragonal phase, as it shifts upward and merges with the higher-frequency band in the cubic phases.",
+    "compositions_mentioned": [
+      "t-LLZO",
+      "c-LLZO",
+      "Ta-LLZO"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "042719f947698105",
+    "doi": "10.48550/arXiv.2608.04690",
+    "title": "Raman Signatures of Lithium Ion Dynamics in LLZO Garnet Electrolytes: Atomistic Insights from MD-Raman Calculations",
+    "family": "LLZO garnets",
+    "scout": "oxides",
+    "trend": "Lower-symmetry Raman channels (B₁g, B₂g) active in the tetragonal phase produce sharp mid-frequency peaks, which vanish in the cubic phase due to higher symmetry.",
+    "quote": "The lower-symmetry B₁g and B₂g channels active in t-LLZO produce its sharp mid-frequency peaks... In the conducting phases, the higher average cubic symmetry switches these channels off.",
+    "compositions_mentioned": [
+      "t-LLZO",
+      "c-LLZO",
+      "Ta-LLZO"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "919b11b8c446fee6",
+    "doi": "10.48550/arXiv.2608.04690",
+    "title": "Raman Signatures of Lithium Ion Dynamics in LLZO Garnet Electrolytes: Atomistic Insights from MD-Raman Calculations",
+    "family": "LLZO garnets",
+    "scout": "oxides",
+    "trend": "Ta doping introduces a high-frequency O–Ta–O Raman band near 730 cm⁻¹, absent in undoped LLZO, which scales with Ta content.",
+    "quote": "Ta-LLZO exhibits an additional intensity in the high-frequency region near 730 cm⁻¹, which we assign to O–Ta–O vibrations. This band is absent in undoped LLZO and provides a direct spectroscopic marker of Ta incorporation.",
+    "compositions_mentioned": [
+      "Ta-LLZO"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "480688b3ef54e4b6",
+    "doi": "10.1021/acsaem.5c02979",
+    "title": "Bottleneck Size Manipulation through the Introduction of Large-Radius Alkali Ions in Na Sites of a NaSICON Solid Electrolyte: A Computational Proof of Concept",
+    "family": "NaSICON oxides",
+    "scout": "oxides",
+    "trend": "Substituting Na(1) sites with larger alkali ions (e.g., K+ or Cs+) expands the c-axis lattice parameter and widens migration bottlenecks.",
+    "quote": "the unit cell tends to elongate along the c-direction only when the substitution occurs at the Na(1) site",
+    "compositions_mentioned": [
+      "Na1+xZr2(SiO4)x(PO4)3-x",
+      "Na4Zr2(SiO4)3"
+    ],
+    "source": "openalex",
+    "text_kind": "fulltext",
+    "verified": true,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "09c03b35b3967986",
+    "doi": "10.1021/acsaem.5c02979",
+    "title": "Bottleneck Size Manipulation through the Introduction of Large-Radius Alkali Ions in Na Sites of a NaSICON Solid Electrolyte: A Computational Proof of Concept",
+    "family": "NaSICON oxides",
+    "scout": "oxides",
+    "trend": "Larger alkali dopants (e.g., Cs+) induce greater lattice expansion along the c-axis than smaller ones (e.g., K+).",
+    "quote": "this elongation is strongly influenced by the ionic radius value of the alkali dopant, being more than twice larger in the case of Cs+",
+    "compositions_mentioned": [
+      "Na4Zr2(SiO4)3"
+    ],
+    "source": "openalex",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "443c7a24d1076600",
+    "doi": "10.48550/arXiv.2508.07826",
+    "title": "Impact of Ce Substitution on Structural and Electrochemical Properties of Ga Doped Garnet Li7La3Zr2O12 Solid Electrolyte",
+    "family": "garnet oxides (LLZO)",
+    "scout": "oxides",
+    "trend": "Co-doping Ga (Li-site) with Ce (Zr-site) stabilizes the cubic phase and increases density up to an optimal Ce content.",
+    "quote": "Ga-Ce co-doping in garnet LLZO helped in the formation of cubic phase without any probable peak splitting which generally occurs due to the presence of secondary phase.",
+    "compositions_mentioned": [
+      "Li6.4Ga0.2La3Zr2-xCexO12"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": true,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "1d76f01f9da2d684",
+    "doi": "10.48550/arXiv.2508.07826",
+    "title": "Impact of Ce Substitution on Structural and Electrochemical Properties of Ga Doped Garnet Li7La3Zr2O12 Solid Electrolyte",
+    "family": "garnet oxides (LLZO)",
+    "scout": "oxides",
+    "trend": "Ce substitution at the Zr site expands the lattice and increases density up to an optimal level, beyond which lattice contraction and density decrease occur.",
+    "quote": "With the increase in content of Ce, the peaks are shifted towards the lower theta value... This can be due to the substitution of higher ionic radii Ce (0.87 Å) at the site of lower ionic radii Zr (0.78 Å).",
+    "compositions_mentioned": [
+      "Li6.4Ga0.2La3Zr2-xCexO12"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "252fc0682eae0a01",
+    "doi": "10.48550/arXiv.2508.07826",
+    "title": "Impact of Ce Substitution on Structural and Electrochemical Properties of Ga Doped Garnet Li7La3Zr2O12 Solid Electrolyte",
+    "family": "garnet oxides (LLZO)",
+    "scout": "oxides",
+    "trend": "Ce acts as a sintering aid, improving grain growth and densification up to an optimal Ce content.",
+    "quote": "Ce will act as a sintering aid and help in the grain growth. This will lead to the densification of garnet LLZO which in turn enhances the Li ion migration pathways.",
+    "compositions_mentioned": [
+      "Li7La3Zr2O12"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "72f2963c4be3ef58",
+    "doi": "10.48550/arXiv.2508.07826",
+    "title": "Impact of Ce Substitution on Structural and Electrochemical Properties of Ga Doped Garnet Li7La3Zr2O12 Solid Electrolyte",
+    "family": "garnet oxides (LLZO)",
+    "scout": "oxides",
+    "trend": "Excess Ga at the Li site reduces lithium content and segregates at grain boundaries, limiting ionic conductivity.",
+    "quote": "the excess of Ga content at the Li site decreases the overall lithium content and results into lower Li ion conductivity. Also, Ga tends to segregate into grain boundaries which also limit the ionic conductivity by offering grain boundary resistance.",
+    "compositions_mentioned": [
+      "Li7La3Zr2O12"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "5e0f5134018f815e",
+    "doi": "10.48550/arXiv.2603.28012",
+    "title": "A Comparative Study of Molecular Dynamics Approaches for Simulating Ionic Conductivity in Solid Lithium Electrolytes",
+    "family": "halides",
+    "scout": "halides",
+    "trend": "In halide-based lithium conductors, fully occupied crystal structures tend to show little to no diffusion in simulations, suggesting defect-mediated mechanisms are critical for conductivity.",
+    "quote": "some materials which are known to exhibit high diffusion experimentally, namely fft (β-Li3N) and rr5 (LiTi2(PO4)3), show little diffusion in our simulations. We anticipate that a diffusion mechanism mediated by a small concentration of defects is necessary for diffusion in these cases.",
+    "compositions_mentioned": [
+      "fft (β-Li3N)",
+      "rr5 (LiTi2(PO4)3)"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "7e26368ba0312c20",
+    "doi": "10.1038/s41467-026-71304-3",
+    "title": "Triggering dynamically disordered lithium sublattice in superionic conductors",
+    "family": "halides",
+    "scout": "halides",
+    "trend": "Incorporation of NH2- into halide frameworks can promote polyanion rotations that enhance Li+ sublattice disorder and ionic conductivity.",
+    "quote": "The experimentally synthesized NH2- incorporated Li2ZrCl5.92(NH2)0.08 demonstrates a four-fold higher conductivity over Li2ZrCl6 control",
+    "compositions_mentioned": [
+      "Li2ZrCl5.92(NH2)0.08",
+      "Li2ZrCl6"
+    ],
+    "source": "openalex",
+    "text_kind": "abstract",
+    "verified": true,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "521fe2eafe48b361",
+    "doi": "10.1038/s41467-026-71304-3",
+    "title": "Triggering dynamically disordered lithium sublattice in superionic conductors",
+    "family": "halides",
+    "scout": "halides",
+    "trend": "Polyanion rotations in halide frameworks can trigger dynamically disordered Li sublattices, enhancing ionic conductivity.",
+    "quote": "This work provides an insight that flexible anion rotations could promote the dynamically disordered lithium sublattice distribution as well as the ionic conductivity.",
+    "compositions_mentioned": [],
+    "source": "openalex",
+    "text_kind": "abstract",
+    "verified": true,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "505dcb9e03546979",
+    "doi": "10.1002/adma.202501838",
+    "title": "Interlayer Design for Halide Electrolytes in All‐Solid‐State Lithium Metal Batteries",
+    "family": "halides",
+    "scout": "halides",
+    "trend": "Substituting Yb with Lu in Li3YbCl6 improves compatibility with lithium metal via interlayer design.",
+    "quote": "By substituting Yb with Lu, Li3LuCl6 electrolytes with Li6PI3 interlayers reach a CCD of 1.0 mA cm−2",
+    "compositions_mentioned": [
+      "Li3YbCl6",
+      "Li3LuCl6"
+    ],
+    "source": "openalex",
+    "text_kind": "abstract",
+    "verified": true,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "9ec39f0214755b8e",
+    "doi": "10.48550/arXiv.2511.15402",
+    "title": "Mechanistic study of mixed lithium halides solid state electrolytes",
+    "family": "halides",
+    "scout": "halides",
+    "trend": "In Li3YCl6xBr6(1-x), increasing Cl content reduces lattice volume but shortens Y–Cl bonds, which can increase Li-ion mobility despite the volume contraction.",
+    "quote": "Increasing the Cl content also leads to a contraction of the octahedral framework (as evidenced by the Y-Y peak shift in Fig. 4), thereby reducing Li-ion mobility; however, the presence of Cl, which forms shorter Y-Cl bonds, facilitates faster Li-ion migration.",
+    "compositions_mentioned": [
+      "Li3YCl6xBr6(1-x)"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "54d7fc250027fb17",
+    "doi": "10.48550/arXiv.2511.15402",
+    "title": "Mechanistic study of mixed lithium halides solid state electrolytes",
+    "family": "halides",
+    "scout": "halides",
+    "trend": "In Li3YCl6xBr6(1-x), the P3̄m1 phase tends to have higher conductivity than the C2/m phase across compositions.",
+    "quote": "The potential predicts that the P3̄m1 phase has a higher conductivity at almost all volumes.",
+    "compositions_mentioned": [
+      "Li3YCl6xBr6(1-x)"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "f02987c6733f5f02",
+    "doi": "10.48550/arXiv.2511.15402",
+    "title": "Mechanistic study of mixed lithium halides solid state electrolytes",
+    "family": "halides",
+    "scout": "halides",
+    "trend": "In Li3YCl6xBr6(1-x), the 1:1 halide composition (x ≈ 0.5) often yields the highest conductivity, especially in the P3̄m1 phase.",
+    "quote": "The maximum of the conductivity is achieved for a composition around 75% of Cl with an average conductivity that is around 8 times that obtained for the pure Br structure.",
+    "compositions_mentioned": [
+      "Li3YCl6xBr6(1-x)"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "3b2397e9857d1634",
+    "doi": "10.48550/arXiv.2511.15402",
+    "title": "Mechanistic study of mixed lithium halides solid state electrolytes",
+    "family": "halides",
+    "scout": "halides",
+    "trend": "In Li3MBr3Cl3 (M = In, Y, Sc, Sb), B-site alloying (e.g., Y-In) can stabilize the highly conductive P3̄m1 phase without significantly reducing Li-ion conductivity.",
+    "quote": "Across the alloy series, the conductivity varies only moderately with B-site composition compared with the stronger compositional effects observed for the relative stability of the P3̄m1 and C2/m phases.",
+    "compositions_mentioned": [
+      "Li3MBr3Cl3"
+    ],
+    "source": "arxiv",
+    "text_kind": "fulltext",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  }
+]

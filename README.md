@@ -55,16 +55,18 @@ flowchart LR
 
 | Agent | Decision it owns | Model |
 |---|---|---|
-| Literature Scout ×3 | What evidence exists for its family | Mistral Small (agent), Mistral OCR, Claude Haiku (card extraction) |
-| Hypothesis Generator | Which hypotheses are worth testing | Claude Sonnet |
-| Screening | Which candidates satisfy each hypothesis | Claude Haiku + Python |
-| Experiment Planner | Which batch to measure (scores 3 designs per round) | Claude Sonnet |
-| Safety & approval | Whether spending is allowed | Claude Haiku + Omnigent policy `measure_gate` (WhatsApp via Zavu / dashboard) |
+| Literature Scout ×3 | What evidence exists for its family | Mistral Small (agent, card extraction), Mistral OCR |
+| Hypothesis Generator | Which hypotheses are worth testing | Mistral Large |
+| Screening | Which candidates satisfy each hypothesis | Mistral Small + RF surrogate |
+| Experiment Planner | Which batch to measure (scores 3 designs per round) | Mistral Large |
+| Safety & approval | Whether spending is allowed | Mistral Small + Omnigent policy `measure_gate` (WhatsApp via Zavu / dashboard) |
 | Lab Runner | Runs the measurement | Code only |
-| Critic | Whether the conclusion holds | Gemini via OpenRouter (non-Anthropic on purpose) |
-| PI (orchestrator) | Runs the loop; the only agent allowed to call `measure` | Claude Sonnet |
+| Critic | Whether the conclusion holds | Claude Sonnet via OpenRouter (different family from the hypothesis generator, on purpose) |
+| PI (orchestrator) | Runs each round; the only agent allowed to call `measure` | Mistral Large |
 
-**Models and keys.** Claude (Sonnet 5.5, Haiku 4.5) and the Critic (Gemini) are reached through OpenRouter; the Literature Scouts through Mistral. `scripts/setup_omnigent_providers.py` registers them as Omnigent providers that read keys from `.env` (never stored in bundles or in Omnigent). The live demo and the overnight campaigns use separate OpenRouter keys, each with its own credit limit, so a campaign can never spend the demo budget.
+**Models and keys.** Mistral is the lab's engine: Mistral Large for the decisions (PI, Hypothesis Generator, Experiment Planner) and Mistral Small for tool-driven work (Screening, Safety, Literature Scouts). The Critic is Claude Sonnet through OpenRouter, deliberately a different model family from the hypothesis generator. Every agent runs on Omnigent's lean `openai-agents` harness. `scripts/setup_omnigent_providers.py` registers the providers, which read keys from `.env` (never stored in bundles or in Omnigent). The live demo and the overnight campaigns use separate Mistral and OpenRouter keys, so a campaign can never spend the demo budget.
+
+**One session per round.** `scripts/run_campaign.py` runs each round of the discovery loop as a fresh Omnigent session. The research record carries the state between rounds, so the PI's context never grows, a failed round can be retried, and no session approaches Omnigent's 30-minute headless limit. The driver stops when the budget is spent or after two rounds without progress. Each round session also has a hard spend cap enforced by an Omnigent cost policy.
 
 **How it runs on Omnigent.** `agents/template/` is a directory bundle: the PI plus six sub-agents, each with its own MCP tool allow-list (`lab/mcp_server.py`, `literature/mcp_server.py`). Only the PI can call `measure`, and the Omnigent policy `policies/lab_policies.py::measure_gate` checks every call (rationale, hypothesis id and chosen design required, ≤ 5 per round, no repeated batch) and holds it until the scientist answers YES/NO on WhatsApp or presses Approve/Deny on the dashboard. Every decision goes to a JSONL research record (`results/runs/`) that is mirrored live to Supabase (`lab/sync.py`).
 
@@ -88,9 +90,11 @@ cp .env.example .env             # fill in keys
 make data                        # OBELiX -> data/pool.csv, results/eda_summary.json
 make features baselines compare  # descriptors, 5 baselines x 50 seeds, descriptor choice (no API key needed)
 make scouts                      # [API] evidence cards for sulfides / oxides / halides (cached)
-make live                        # [API] live demo with WhatsApp / dashboard approvals
-make bench SEED=0                # [API] one unattended IonForge campaign
+make smoke                       # [API] 2-round end-to-end test
+make live ROUNDS=3               # [API] live demo with WhatsApp / dashboard approvals
+make bench SEED=0                # [API] one unattended IonForge campaign (10 rounds)
 make ablations SEED=0            # [API] no-literature and anonymized ablations
+make campaigns                   # [API] overnight: IonForge x5, each ablation x3
 make analyze publish             # campaigns vs baselines; curves to the dashboard
 ```
 `make help` lists every target. Before the demo: `python scripts/clear_demo_data.py`.

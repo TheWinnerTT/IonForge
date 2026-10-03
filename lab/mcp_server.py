@@ -218,17 +218,76 @@ def record_decision(kind: str, author: str, payload: dict) -> dict:
     allowed = {"evidence", "hypothesis", "candidate_set", "experiment_spec", "review", "next_step"}
     if kind not in allowed:
         return {"error": f"kind must be one of {sorted(allowed)}"}
+    if not isinstance(payload, dict) or not payload:
+        return {"error": "payload must be a non-empty object; record nothing if there is nothing to record"}
     lab = _lab()
     lab.log_event(kind, author=author, payload=payload)
     return {"ok": True, "run_id": lab.run_id}
 
 
 @mcp.tool()
-def research_record(kinds: list[str] | None = None, last_n: int = 30) -> list[dict]:
-    """Read the shared research record (hypotheses, plans, reviews, measurements)."""
+def research_record(kinds: list[str] | None = None, last_n: int = 30, round: int | None = None,
+                    full: bool = False) -> list[dict]:
+    """Read the shared research record: evidence, hypotheses, candidate sets, experiment
+    specs, reviews, measurements and next steps.
+
+    Compact by default (long texts and lists trimmed, internal fields dropped); pass
+    full=True only when you need an entry verbatim. Filter with kinds (e.g. ["hypothesis",
+    "review"]) and round to read only what you need.
+    """
     lab = _lab()
-    evs = lab.events(tuple(kinds) if kinds else None)[-last_n:]
-    return json.loads(json.dumps(evs, default=str))
+    evs = [e for e in lab.events(tuple(kinds) if kinds else None) if e.get("event") != "run_start"]
+    if round is not None:
+        evs = [e for e in evs if e.get("round") == round]
+    evs = evs[-max(1, min(last_n, 100)):]
+    if full:
+        return json.loads(json.dumps(evs, default=str))
+    return [_compact_event(e) for e in evs]
+
+
+def _compact_event(e: dict) -> dict:
+    out = {"kind": e.get("event"), "round": e.get("round"), "author": e.get("author") or e.get("requested_by")}
+    kind, p = e.get("event"), e.get("payload") or {}
+    if kind == "measure":
+        out.update(design=e.get("design"), hypothesis_id=e.get("hypothesis_id"),
+                   results=[_measurement_view(r) for r in e.get("results", [])])
+    elif kind == "evidence":
+        out["payload"] = _pick(p, "id", "family", "trend", "claim", "doi")
+    elif kind == "candidate_set":
+        out["payload"] = {"hypothesis_id": p.get("hypothesis_id"),
+                          "candidates": [_pick(c, "candidate_id", "p_hit", "mu", "sd")
+                                         for c in (p.get("candidates") or [])[:8] if isinstance(c, dict)]}
+    elif kind == "experiment_spec":
+        out["payload"] = {**_pick(p, "id", "hypothesis_id", "chosen_design", "candidate_ids", "rationale"),
+                          "designs": [_pick(d, "name", "scores") for d in (p.get("designs") or []) if isinstance(d, dict)]}
+    else:  # hypothesis, review, next_step: short structured objects already
+        out["payload"] = _trim(p)
+    return {k: v for k, v in out.items() if v not in (None, [], {})}
+
+
+def _pick(d: dict, *keys: str) -> dict:
+    return {k: _trim(d[k], 1) for k in keys if d.get(k) not in (None, "", [], {})}
+
+
+def _measurement_view(r: dict) -> dict:
+    row = {"candidate_id": r["candidate_id"], "log10_sigma": round(r["log_sigma"], 2), "is_hit": r["is_hit"]}
+    if not ANON:
+        row.update(composition=r["composition"], family=r["family"])
+    return row
+
+
+def _trim(v, depth: int = 0):
+    """Shorten long strings and lists so the record stays cheap to re-read."""
+    if isinstance(v, str):
+        return v if len(v) <= 160 else v[:157] + "..."
+    if isinstance(v, list):
+        items = [_trim(x, depth + 1) for x in v[:8]]
+        return items + [f"... {len(v) - 8} more"] if len(v) > 8 else items
+    if isinstance(v, dict):
+        if depth >= 3:
+            return "{...}"
+        return {k: _trim(x, depth + 1) for k, x in v.items() if x not in (None, "", [], {})}
+    return v
 
 
 def _has_element(formula: str, el: str) -> bool:

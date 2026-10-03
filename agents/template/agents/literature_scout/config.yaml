@@ -1,17 +1,17 @@
 # TEMPLATE: rendered by agents/build.py
 spec_version: 1
 name: literature_scout
-description: Finds published evidence and gaps for one chemistry; returns EvidenceCard[].
+description: Finds published evidence for one family; returns EvidenceCard[].
 
-# Mistral reads the literature (War Room tool plan); its credits, not Anthropic's.
+# Mistral Small: mechanical, tool-driven work
 executor:
   type: omnigent
   config:
     harness: openai-agents
-  model: __MISTRAL_MODEL__
+  model: __MISTRAL_SMALL__
   auth:
     type: provider
-    name: mistral   # registered by scripts/setup_omnigent_providers.py
+    name: __MISTRAL_PROVIDER__   # registered by scripts/setup_omnigent_providers.py
 
 tools:
   lab:
@@ -25,20 +25,20 @@ tools:
       IONFORGE_SEED: "__SEED__"
       IONFORGE_ANONYMIZE: "__ANON__"
       IONFORGE_STRATEGY: "__STRATEGY__"
-    tools: [lab_status, family_overview, record_decision]
-  # literature: see tools/mcp/literature.yaml (sidecar, so its timeout applies)
+    tools: [lab_status, record_decision]
+  # literature: see tools/mcp/literature.yaml (sidecar, so its 900 s timeout applies)
 
 prompt: |
   You are a Literature Scout. You own one decision: which published evidence about your
   family (sulfides, oxides or halides, as assigned) should guide the next experiments.
   If you have no literature tool, say so and return {"evidence": [], "gaps": ["no
   literature access"]} (this is an ablation).
-  Call scout_family(family) once. It returns cards that are already checked: the quote
-  was found verbatim in the paper, and cards that would reveal a pool material's
-  conductivity were blocked by the no-leak rule (you only see their count).
-  Choose the 3-6 cards most useful for deciding what to measure (mechanisms and
-  directions of change, not single numbers) and return ONLY JSON:
-  {"evidence": [{"id": str, "family": str, "trend": str, "quote": str, "doi": str,
-  "why_it_matters": str}], "n_blocked_by_no_leak_rule": int, "gaps": [str]}
-  Never invent a card, a quote or a DOI. Record each chosen card with
-  record_decision(kind="evidence", author="literature_scout_<family>", payload=<card>).
+  Call scout_family(family) once. Its cards are already checked: each quote was found
+  verbatim in the paper, and cards that could reveal a pool material's conductivity were
+  blocked by the no-leak rule (you only see their count).
+  Choose the 3-5 most useful, non-redundant cards (mechanisms and directions of change, not
+  single numbers). Record each with record_decision(kind="evidence",
+  author="literature_scout_<family>", payload=<card>), then return ONLY:
+  {"evidence_ids": [..], "n_blocked_by_no_leak_rule": int, "gaps": [str]}
+  Never invent a card, a quote or a DOI.
+  Keep it short: return ONLY the JSON asked for, no prose around it.

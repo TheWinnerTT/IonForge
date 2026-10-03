@@ -38,9 +38,25 @@ def _save(cards: list[dict]) -> None:
     CARDS.write_text(json.dumps(cards, indent=2, ensure_ascii=False))
 
 
+def _words(text: str) -> set[str]:
+    return {w for w in "".join(ch.lower() if ch.isalnum() else " " for ch in str(text)).split() if len(w) > 3}
+
+
+def _jaccard(a: set[str], b: set[str]) -> float:
+    return len(a & b) / len(a | b) if a and b else 0.0
+
+
 def _report(family: str, cards: list[dict]) -> dict:
     mine = [c for c in cards if c.get("scout") == family]
-    usable = [c for c in mine if c.get("verified") and not c.get("blocked_leak")]
+    usable, seen = [], []
+    for c in mine:  # one card per idea: several quotes from one paper often state the same trend
+        if not c.get("verified") or c.get("blocked_leak"):
+            continue
+        words = _words(c.get("trend", "")) | _words(c.get("quote", ""))
+        if any(_jaccard(words, w) >= 0.5 for w in seen):
+            continue
+        seen.append(words)
+        usable.append(c)
     return {
         "family": family,
         "cards": [{k: c.get(k) for k in PUBLIC_FIELDS} for c in usable],
