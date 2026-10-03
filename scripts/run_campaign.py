@@ -38,10 +38,13 @@ ROUND_TIMEOUT_S = 25 * 60
 MAX_FAILED_ROUNDS = 2
 
 
-def build(variant: str, task: str, seed: int, budget: int, usd_cap: float) -> Path:
+def build(variant: str, task: str, seed: int, budget: int, usd_cap: float, run_id: str | None = None) -> Path:
+    if run_id and (ROOT / "agents" / "build" / run_id / "config.yaml").exists():
+        return ROOT / "agents" / "build" / run_id  # continue an existing campaign: same bundle, same record
+    extra = ["--run-id", run_id] if run_id else []  # e.g. a fresh CI machine: rebuild under the same name
     out = subprocess.run(
         [sys.executable, str(ROOT / "agents" / "build.py"), "--variant", variant, "--task", task,
-         "--seed", str(seed), "--budget", str(budget), "--usd-cap", str(usd_cap)],
+         "--seed", str(seed), "--budget", str(budget), "--usd-cap", str(usd_cap), *extra],
         capture_output=True, text=True, cwd=ROOT,
     )
     if out.returncode != 0:
@@ -74,18 +77,19 @@ def round_prompt(n: int, state: dict) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--variant", default="bench",
-                    choices=["live", "smoke", "bench", "ablation_nolit", "ablation_anon"])
+                    choices=["live", "live_judges", "smoke", "bench", "ablation_nolit", "ablation_anon"])
     ap.add_argument("--task", default="main")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--budget", type=int, default=50)
     ap.add_argument("--max-rounds", type=int, default=0, help="stop after this many rounds (0 = until budget)")
     ap.add_argument("--usd-cap", type=float, default=1.5, help="hard spend cap per round session (USD)")
     ap.add_argument("--dry-run", action="store_true", help="render and print the plan; call nothing")
+    ap.add_argument("--run-id", help="continue this campaign (reuses agents/build/<run_id>/ and its record)")
     args = ap.parse_args()
 
     if args.variant == "smoke":
         args.budget = min(args.budget, 10)
-    bundle = build(args.variant, args.task, args.seed, args.budget, args.usd_cap)
+    bundle = build(args.variant, args.task, args.seed, args.budget, args.usd_cap, args.run_id)
     run_id = bundle.name
     strategy = {"ablation_nolit": "ablation_no_lit", "ablation_anon": "ablation_anon"}.get(args.variant, "ionforge")
     logs = ROOT / "results" / "logs" / run_id
@@ -108,7 +112,10 @@ def main() -> None:
                 break
             continue
         t0 = time.time()
-        log = logs / f"round-{n:02d}.log"
+        # numbered by the lab's round, not this loop's counter: continued campaigns keep every log
+        log = logs / f"round-{state['round'] + 1:02d}.log"
+        if log.exists():
+            log = logs / f"round-{state['round'] + 1:02d}-{time.strftime('%H%M%S')}.log"
         with log.open("w") as fh:
             try:
                 rc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, cwd=ROOT,

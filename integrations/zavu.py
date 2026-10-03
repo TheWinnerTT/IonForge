@@ -37,7 +37,8 @@ def send_whatsapp(text, to=None):
     return r.json()
 
 
-def request_approval(run_id, round_, design, n_measurements, materials, reason, benchmark=False):
+def request_approval(run_id, round_, design, n_measurements, materials, reason, benchmark=False, notify=True):
+    """notify=False: dashboard-only approval (judge rounds), no WhatsApp message."""
     request = (f"IonForge wants to spend {n_measurements} measurements on the *{design}* design "
                f"({', '.join(materials[:5])}) because {reason}")
     if benchmark:
@@ -49,8 +50,10 @@ def request_approval(run_id, round_, design, n_measurements, materials, reason, 
         return row
     row = db.insert("approvals", {"run_id": run_id, "round": round_, "request": request, "design": design})[0]
     approval_id = row.get("id", "offline")
-    send_whatsapp(f"🔬 {request}\n\nReply *YES {approval_id}* or *NO {approval_id}*.")
-    db.event(run_id, round_, "safety", "approval", f"Approval #{approval_id} requested via WhatsApp", {"approval_id": approval_id})
+    if notify:
+        send_whatsapp(f"🔬 {request}\n\nReply *YES {approval_id}* or *NO {approval_id}*.")
+    channel = "WhatsApp" if notify else "the dashboard"
+    db.event(run_id, round_, "safety", "approval", f"Approval #{approval_id} requested via {channel}", {"approval_id": approval_id})
     return row
 
 
@@ -64,6 +67,9 @@ def wait_for_decision(approval_id, timeout_s=600, poll_s=3):
         if rows and rows[0]["status"] in ("approved", "denied", "auto_approved"):
             return "approved" if rows[0]["status"] != "denied" else "denied"
         time.sleep(poll_s)
+    # Close the request so it does not stay pending forever (dashboard + judge runner read it).
+    db.update("approvals", {"id": approval_id, "status": "pending"},
+              {"status": "expired", "decided_at": datetime.now(timezone.utc).isoformat()})
     return "timeout"
 
 

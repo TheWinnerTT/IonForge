@@ -9,6 +9,7 @@ round of the discovery loop; scripts/run_campaign.py runs the rounds of a campai
 
 Variants (strategy = `runs.strategy` in supabase/schema.sql)
   live            ionforge         human approval on WhatsApp / dashboard before every measurement
+  live_judges     ionforge         judge-triggered rounds: dashboard approval only, 90 s timeout (run id keeps "-live-")
   smoke           ionforge         end-to-end test: demo keys, approval auto-granted and logged,
                                    budget 10 measurements = 2 rounds (excluded from all statistics)
   bench           ionforge         approval auto-granted and logged: overnight campaigns
@@ -66,6 +67,10 @@ PROVIDER_KEYS = {
 
 VARIANTS = {
     "live": {"strategy": "ionforge", "approval": "whatsapp", "anon": "0", "literature": True, "keys": "demo"},
+    # Judge-triggered rounds (scripts/judge_runner.py): approval on the dashboard only, no WhatsApp,
+    # short approval timeout; run ids keep "-live-" so lab/analyze.py excludes them.
+    "live_judges": {"strategy": "ionforge", "approval": "dashboard", "anon": "0", "literature": True,
+                    "keys": "demo", "approval_timeout_s": 90},
     "smoke": {"strategy": "ionforge", "approval": "never", "anon": "0", "literature": True, "keys": "demo"},
     "bench": {"strategy": "ionforge", "approval": "never", "anon": "0", "literature": True, "keys": "campaigns"},
     "ablation_nolit": {"strategy": "ablation_no_lit", "approval": "never", "anon": "0", "literature": False,
@@ -97,16 +102,17 @@ def missing_keys(variant: str) -> list[str]:
 
 def run_id_for(variant: str, task: str, seed: int) -> str:
     strategy = VARIANTS[variant]["strategy"]
-    if variant in ("live", "smoke"):
-        return f"{strategy}-{variant}-{task}-{time.strftime('%m%d-%H%M%S')}"
+    if variant in ("live", "smoke", "live_judges"):
+        kind = "smoke" if variant == "smoke" else "live"  # "-live-" keeps judge runs out of the statistics
+        return f"{strategy}-{kind}-{task}-{time.strftime('%m%d-%H%M%S')}"
     return f"{strategy}-{task}-s{seed}"
 
 
-def render(variant: str, task: str, seed: int, budget: int, usd_cap: float) -> Path:
+def render(variant: str, task: str, seed: int, budget: int, usd_cap: float, run_id: str | None = None) -> Path:
     if "mistral" in CRITIC_MODEL.lower():
         sys.exit("CRITIC_MODEL must be a different model family from the Mistral Hypothesis Generator")
     cfg = VARIANTS[variant]
-    run_id = run_id_for(variant, task, seed)
+    run_id = run_id or run_id_for(variant, task, seed)  # --run-id rebuilds an existing campaign's bundle
     subs = {
         **providers_for(variant),
         "__MISTRAL_LARGE__": MISTRAL_LARGE,
@@ -121,6 +127,7 @@ def render(variant: str, task: str, seed: int, budget: int, usd_cap: float) -> P
         "__BUDGET__": str(budget),
         "__PYTHON__": str(ROOT / ".venv" / "bin" / "python"),
         "__USD_CAP__": f"{usd_cap:.2f}",
+        "__APPROVAL_TIMEOUT__": str(cfg.get("approval_timeout_s", 900)),
     }
     dest = OUT / run_id
     if dest.exists():
@@ -157,6 +164,7 @@ def main() -> None:
     ap.add_argument("--budget", type=int, default=50)
     ap.add_argument("--usd-cap", type=float, default=1.5,
                     help="hard LLM spend cap per round session (USD), enforced by Omnigent")
+    ap.add_argument("--run-id", help="rebuild the bundle of an existing campaign under this run id")
     args = ap.parse_args()
     if args.variant == "smoke":
         args.budget = min(args.budget, 10)
@@ -168,7 +176,7 @@ def main() -> None:
                 print(f"skipped {msg}", file=sys.stderr)
                 continue
             sys.exit(msg)
-        print(render(v, args.task, args.seed, args.budget, args.usd_cap))
+        print(render(v, args.task, args.seed, args.budget, args.usd_cap, args.run_id))
 
 
 if __name__ == "__main__":

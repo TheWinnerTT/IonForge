@@ -8,7 +8,7 @@ SEED ?= 0
 ROUNDS ?= 3
 LOAD_ENV := set -a; [ -f .env ] && source .env; set +a; eval "$$($(PY) scripts/openrouter_keys.py --export)"
 
-.PHONY: help setup data features baselines compare agents scouts smoke live bench ablations campaigns analyze publish reproduce clean-runs
+.PHONY: help setup data features baselines compare agents scouts smoke live bench ablations campaigns judge-runner analyze publish reproduce clean-runs
 
 help:             ## list targets
 	@grep -E '^[a-z-]+:.*##' Makefile | sed 's/:.*##/ —/'
@@ -56,6 +56,9 @@ campaigns:        ## [API] overnight plan: IonForge x5 seeds, each ablation x3, 
 	  $(MAKE) --no-print-directory bench SEED=$$s; \
 	  if [ $$s -lt 3 ]; then $(MAKE) --no-print-directory ablations SEED=$$s; fi; \
 	done
+
+judge-runner:     ## [API] serve the dashboard's "Run one round" button (needs JUDGE_RUNS=on in .env)
+	$(LOAD_ENV); $(PY) scripts/judge_runner.py
 
 analyze:          ## agent campaigns vs baselines: speed-up, hits, families
 	$(PY) -m lab.analyze --task $(TASK)
