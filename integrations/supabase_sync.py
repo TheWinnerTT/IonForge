@@ -29,6 +29,13 @@ class Supabase:
             "Prefer": prefer,
         }
 
+    @staticmethod
+    def _columns(rows):
+        """Union of keys, so bulk rows with different fields share one column list.
+        With Prefer: missing=default, absent keys take the column default."""
+        rows = rows if isinstance(rows, list) else [rows]
+        return ",".join(dict.fromkeys(k for r in rows for k in r))
+
     def _req(self, method, table, **kw):
         r = requests.request(method, f"{self.url}/rest/v1/{table}", timeout=30, **kw)
         if r.status_code >= 400:
@@ -39,15 +46,20 @@ class Supabase:
         if not self.enabled:
             print(f"[supabase offline] {table}: {json.dumps(rows, default=str)[:300]}")
             return rows if isinstance(rows, list) else [rows]
-        return self._req("POST", table, headers=self._headers(), data=json.dumps(rows, default=str))
+        return self._req(
+            "POST", table,
+            headers=self._headers("return=representation,missing=default"),
+            params={"columns": self._columns(rows)},
+            data=json.dumps(rows, default=str),
+        )
 
     def upsert(self, table, rows, on_conflict="id"):
         if not self.enabled:
             return self.insert(table, rows)
         return self._req(
             "POST", table,
-            headers=self._headers("resolution=merge-duplicates,return=representation"),
-            params={"on_conflict": on_conflict},
+            headers=self._headers("resolution=merge-duplicates,return=representation,missing=default"),
+            params={"on_conflict": on_conflict, "columns": self._columns(rows)},
             data=json.dumps(rows, default=str),
         )
 
