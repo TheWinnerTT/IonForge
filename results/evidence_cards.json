@@ -443,5 +443,132 @@
     "verified": false,
     "blocked_leak": false,
     "blocked_reason": null
+  },
+  {
+    "id": "c3d06e9a1a92b98c",
+    "doi": "10.1021/acs.chemmater.6b03630",
+    "title": "Diffusion Mechanism of Li Argyrodite Solid Electrolytes for Li-Ion Batteries and Prediction of Optimized Halogen Doping: The Effect of Li Vacancies, Halogens, and Halogen Disorder",
+    "family": "argyrodites",
+    "scout": "sulfides",
+    "trend": "Halogen distribution over 4a and 4c sites affects Li-ion conductivity; a 1:3 ratio of Cl on these sites is predicted to enhance conductivity.",
+    "quote": "For Li 6 PS 5 Cl, the simulations predict an optimal Cl distribution of 1:3 over sites 4a and 4c, resulting in a Li-ion conductivity that is 2 times larger than that of the currently prepared materials.",
+    "compositions_mentioned": [
+      "Li 6 PS 5 Cl"
+    ],
+    "source": "brightdata",
+    "text_kind": "abstract",
+    "verified": true,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "e80b34d92267f8f4",
+    "doi": "10.1021/acs.chemmater.6b03630",
+    "title": "Diffusion Mechanism of Li Argyrodite Solid Electrolytes for Li-Ion Batteries and Prediction of Optimized Halogen Doping: The Effect of Li Vacancies, Halogens, and Halogen Disorder",
+    "family": "argyrodites",
+    "scout": "sulfides",
+    "trend": "Halogen identity (Cl, Br, I) influences Li-ion diffusion due to differences in local surroundings and distribution over crystallographic sites.",
+    "quote": "The difference in Li-ion conductivity between Li 6 PS 5 Cl and Li 6 PS 5 I, which is several orders of magnitude, is caused by the distribution of the halogen ions over the available crystallographic sites.",
+    "compositions_mentioned": [
+      "Li 6 PS 5 Cl",
+      "Li 6 PS 5 Br",
+      "Li 6 PS 5 I"
+    ],
+    "source": "brightdata",
+    "text_kind": "abstract",
+    "verified": true,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "7f9481e29e27a5c3",
+    "doi": "10.1021/acs.chemmater.6b03630",
+    "title": "Diffusion Mechanism of Li Argyrodite Solid Electrolytes for Li-Ion Batteries and Prediction of Optimized Halogen Doping: The Effect of Li Vacancies, Halogens, and Halogen Disorder",
+    "family": "Li5PS4X2 (X=Cl, Br, I)",
+    "scout": "sulfides",
+    "trend": "Doping with two halogens (Cl, Br, or I) in Li5PS4X2 yields Li-ion conductivities comparable to Li6PS5Cl and Li6PS5Br.",
+    "quote": "simulations were performed on Li 5 PS 4 X 2 (X = Cl, Br, or I), which show Li-ion conductivities similar to those of Li 6 PS 5 Cl and Li 6 PS 5 Br",
+    "compositions_mentioned": [
+      "Li 5 PS 4 Cl 2",
+      "Li 5 PS 4 Br 2",
+      "Li 5 PS 4 I 2"
+    ],
+    "source": "brightdata",
+    "text_kind": "abstract",
+    "verified": true,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "300160a7f27ad0b2",
+    "doi": "10.1021/acsami.0c01289",
+    "title": "Dual-Doped Cubic Garnet Solid Electrolytes with Superior Air Stability",
+    "family": "garnet oxides (LLZO)",
+    "scout": "oxides",
+    "trend": "Dual doping with Ga (Li-site) and Nb (Zr-site) improves air stability by reducing LiOH/Li2CO3 formation.",
+    "quote": "The dopant Ga was found to preferably occupy the Li site and Nb takes the Zr site, while dopant Ca mainly substituted La in the reference sample.",
+    "compositions_mentioned": [
+      "Li6.05La3Ga0.3Zr1.95Nb0.05O12",
+      "Li7La2.75Ca0.25Zr1.75Nb0.25O12"
+    ],
+    "source": "brightdata",
+    "text_kind": "abstract",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "d2f7a6aa3e5a1f86",
+    "doi": "10.1021/acsami.0c01289",
+    "title": "Dual-Doped Cubic Garnet Solid Electrolytes with Superior Air Stability",
+    "family": "garnet oxides (LLZO)",
+    "scout": "oxides",
+    "trend": "Dual doping enhances structural synergy, reducing interfacial resistance and improving electrochemical stability.",
+    "quote": "The inherited properties of the dopants in (Ga, Nb)-LLZO and their structural synergy explain the greatly improved air stability and reduced interfacial resistance.",
+    "compositions_mentioned": [
+      "Li6.05La3Ga0.3Zr1.95Nb0.05O12",
+      "Li7La2.75Ca0.25Zr1.75Nb0.25O12"
+    ],
+    "source": "brightdata",
+    "text_kind": "abstract",
+    "verified": true,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "a208c8308673078d",
+    "doi": "10.1002/pssb.202500615",
+    "title": "Structure–Conductivity Correlation and Phase Evolution Mechanism in LLZO‐Based Solid Electrolytes",
+    "family": "LLZO garnets",
+    "scout": "oxides",
+    "trend": "Sr substitution at La-sites promotes densification and stabilizes Li interfaces by inducing transient glassy phases.",
+    "quote": "Sr substitution at La-sites induces transient glassy phases that accelerate sintering and stabilize Li interfaces.",
+    "compositions_mentioned": [
+      "Sr",
+      "La"
+    ],
+    "source": "brightdata",
+    "text_kind": "abstract",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
+  },
+  {
+    "id": "2150fa11c421c944",
+    "doi": "10.1002/pssb.202500615",
+    "title": "Structure–Conductivity Correlation and Phase Evolution Mechanism in LLZO‐Based Solid Electrolytes",
+    "family": "LLZO garnets",
+    "scout": "oxides",
+    "trend": "Nb/Sr co-doping stabilizes the cubic phase and enhances Li+ transport compared to Ta/Sr co-doping.",
+    "quote": "a cost-effective Nb/Sr co-doping strategy is developed to simultaneously promote densification and Li+ transport.",
+    "compositions_mentioned": [
+      "Nb",
+      "Sr"
+    ],
+    "source": "brightdata",
+    "text_kind": "abstract",
+    "verified": false,
+    "blocked_leak": false,
+    "blocked_reason": null
   }
 ]
