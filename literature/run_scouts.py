@@ -1,7 +1,7 @@
 """Run the three Literature Scouts in parallel and store EvidenceCards.
 
 Pipeline per family: search (OpenAlex + arXiv [+ BrightData]) -> full text
-(Mistral OCR, fallback to abstract) -> Claude extraction -> citation check
+(Mistral OCR, fallback to abstract) -> Mistral extraction -> citation check
 -> no-leak filter -> results/evidence_cards.json + Supabase `evidence`.
 
 Usage:

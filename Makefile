@@ -5,7 +5,7 @@ PY := .venv/bin/python
 OMNI := $(HOME)/.local/bin/omnigent
 TASK ?= main
 SEED ?= 0
-LOAD_ENV := set -a; [ -f .env ] && source .env; set +a
+LOAD_ENV := set -a; [ -f .env ] && source .env; set +a; eval "$$($(PY) scripts/openrouter_keys.py --export)"
 CAMPAIGN := "Run the full discovery campaign until the measurement budget is spent."
 
 .PHONY: help setup data features baselines compare agents scouts live bench ablations analyze publish reproduce clean-runs

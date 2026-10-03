@@ -7,8 +7,9 @@ import json
 import os
 import re
 
-import requests
 from dotenv import load_dotenv
+
+from integrations.llm import openrouter_chat
 
 load_dotenv()
 
@@ -31,28 +32,19 @@ Return only JSON:
 
 
 def critic(round_record, model=None):
-    key = os.getenv("OPENROUTER_API_KEY")
-    if not key:
-        raise RuntimeError("OPENROUTER_API_KEY is not set")
     model = model or os.getenv("CRITIC_MODEL", "google/gemini-3.8-flash")
     if model.startswith("anthropic/"):
         raise ValueError("The Critic must use a non-Anthropic model family")
-    r = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={"Authorization": f"Bearer {key}", "X-Title": "IonForge"},
-        json={
-            "model": model,
-            "response_format": {"type": "json_object"},
-            "temperature": 0.2,
-            "messages": [
-                {"role": "system", "content": SYSTEM},
-                {"role": "user", "content": json.dumps(round_record, default=str)},
-            ],
-        },
-        timeout=120,
-    )
-    r.raise_for_status()
-    content = r.json()["choices"][0]["message"]["content"]
+    data = openrouter_chat({
+        "model": model,
+        "response_format": {"type": "json_object"},
+        "temperature": 0.2,
+        "messages": [
+            {"role": "system", "content": SYSTEM},
+            {"role": "user", "content": json.dumps(round_record, default=str)},
+        ],
+    })
+    content = data["choices"][0]["message"]["content"]
     match = re.search(r"\{.*\}", content, re.S)
     review = json.loads(match.group(0) if match else content)
     review.setdefault("verdict", "accept")
