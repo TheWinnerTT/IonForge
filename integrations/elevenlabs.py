@@ -1,6 +1,6 @@
 """Optional (first cut if late): spoken round briefings with ElevenLabs.
 
-Mistral Small summarizes the round in ~50 words -> ElevenLabs TTS -> mp3 in
+Claude Haiku (via integrations/llm.py: OpenRouter by default) summarizes the round in ~50 words -> ElevenLabs TTS -> mp3 in
 Supabase Storage (bucket `briefings`, public) -> audio_url on a `briefing` event.
 """
 import json
@@ -9,18 +9,18 @@ import os
 import requests
 from dotenv import load_dotenv
 
-from integrations.llm import mistral_chat
+from integrations.llm import complete
 from integrations.supabase_sync import db
 
 load_dotenv()
 
 
+VOICE_SYSTEM = ("You are the voice of an autonomous materials lab. Summarize the round in at most 50 spoken words: "
+                "what was tested, what was learned, what happens next. Plain sentences, no lists, no formulas with subscripts.")
+
+
 def summarize_round(round_record):
-    return mistral_chat(
-        "You are the voice of an autonomous materials lab. Summarize the round in at most 50 spoken words: "
-        "what was tested, what was learned, what happens next. Plain sentences, no lists, no formulas with subscripts.",
-        json.dumps(round_record, default=str), max_tokens=200,
-    ).strip()
+    return complete(VOICE_SYSTEM, json.dumps(round_record, default=str), max_tokens=200, temperature=0.3, timeout=60)
 
 
 def tts(text):

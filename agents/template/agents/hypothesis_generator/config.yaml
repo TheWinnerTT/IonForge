@@ -9,8 +9,8 @@ executor:
     harness: claude-sdk
   model: __SONNET__
   auth:
-    type: api_key
-    api_key: ${ANTHROPIC_API_KEY}
+    type: provider
+    name: __CLAUDE_PROVIDER__   # registered by scripts/setup_omnigent_providers.py
 
 tools:
   lab:
