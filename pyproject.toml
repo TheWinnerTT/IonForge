@@ -1,0 +1,28 @@
+[project]
+name = "ionforge"
+version = "0.1.0"
+description = "Agentic lab for solid-state Li-ion electrolyte discovery (Hack-Nation Challenge 03, Omnigent)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "numpy",
+  "pandas<3",              # matminer 0.10.1
+  "scikit-learn",
+  "scipy",
+  "pymatgen==2026.3.23",   # newer releases break matminer 0.10.1
+  "matminer==0.10.1",
+  "setuptools<81",         # matminer imports pkg_resources
+  "mp-api",
+  "matplotlib",
+  "openpyxl",
+  "httpx",
+  "python-dotenv",
+  "mcp>=2",
+  "pydantic>=2",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["lab", "literature", "integrations", "policies"]

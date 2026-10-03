@@ -1,0 +1,43 @@
+# TEMPLATE: rendered by agents/build.py
+spec_version: 1
+name: experiment_planner
+description: Chooses the next experiment among >= 2 competing designs under a budget.
+
+executor:
+  type: omnigent
+  config:
+    harness: claude-sdk
+  model: __SONNET__
+  auth:
+    type: api_key
+    api_key: ${ANTHROPIC_API_KEY}
+
+tools:
+  lab:
+    type: mcp
+    command: __PYTHON__
+    args: [-m, lab.mcp_server]
+    env:
+      IONFORGE_RUN_ID: "__RUN_ID__"
+      IONFORGE_TASK: "__TASK__"
+      IONFORGE_BUDGET: "__BUDGET__"
+      IONFORGE_SEED: "__SEED__"
+      IONFORGE_ANONYMIZE: "__ANON__"
+      IONFORGE_STRATEGY: "__STRATEGY__"
+    tools: [lab_status, evaluate_designs, surrogate_rank, measurements, research_record, record_decision]
+
+prompt: |
+  You are the Experiment Planner. You own one decision: which batch to measure next.
+  Every round build exactly THREE competing designs from the candidate sets, each with
+  <= 5 unmeasured candidate ids:
+    - "exploit": the highest predicted log10(sigma) (surrogate mu / p_hit);
+    - "explore": the highest surrogate uncertainty (sd), to learn where the model is blind;
+    - "hypothesis_test": the batch that best confirms or refutes the leading hypothesis.
+  Score all three with ONE evaluate_designs call, then choose using expected learning per
+  cost, expected hits and the remaining budget (early rounds may favour learning, late rounds
+  favour hits). Before 5 measurements exist the surrogate is not ready: judge on evidence.
+  Return ONLY JSON: {"experiment_spec": {"id": "X<n>", "hypothesis_id": str,
+  "chosen_design": "exploit|explore|hypothesis_test", "candidate_ids": [..],
+  "designs": [{"name": str, "candidate_ids": [..], "scores": {..}, "why_not": str|null}],
+  "rationale": str, "expected_outcome": str}}
+  Record it with record_decision(kind="experiment_spec", author="experiment_planner", payload=<spec>).

@@ -1,0 +1,39 @@
+# TEMPLATE: rendered by agents/build.py
+spec_version: 1
+name: hypothesis_generator
+description: Turns evidence and results into testable hypotheses; returns Hypothesis[].
+
+executor:
+  type: omnigent
+  config:
+    harness: claude-sdk
+  model: __SONNET__
+  auth:
+    type: api_key
+    api_key: ${ANTHROPIC_API_KEY}
+
+tools:
+  lab:
+    type: mcp
+    command: __PYTHON__
+    args: [-m, lab.mcp_server]
+    env:
+      IONFORGE_RUN_ID: "__RUN_ID__"
+      IONFORGE_TASK: "__TASK__"
+      IONFORGE_BUDGET: "__BUDGET__"
+      IONFORGE_SEED: "__SEED__"
+      IONFORGE_ANONYMIZE: "__ANON__"
+      IONFORGE_STRATEGY: "__STRATEGY__"
+    tools: [lab_status, family_overview, measurements, research_record, record_decision]
+
+prompt: |
+  You are the Hypothesis Generator. You own one decision: which hypotheses are worth testing
+  next. Read the research record (evidence, measurements, reviews). Return ONLY JSON:
+  {"hypotheses": [{"id": "H<n>", "statement": str, "selector": {"families": [..],
+  "elements": [..], "descriptor_rules": [..]}, "predicted_effect": str, "evidence_ids": [..],
+  "confidence": 0-1, "status": "new|revised|reopened", "falsified_if": str,
+  "label": "AI-generated, unvalidated"}]}
+  A reopened hypothesis must be revised or replaced, citing the measurement ids that
+  contradicted it. Prefer hypotheses that discriminate between explanations, and keep at
+  least one exploratory hypothesis about an under-sampled chemistry.
+  Record each with record_decision(kind="hypothesis", author="hypothesis_generator", payload=<h>).

@@ -44,6 +44,30 @@ def host_system(formula):
     return "-".join(sorted(el.symbol for el, x in comp.items() if x >= MAJOR_FRACTION))
 
 
+# OBELiX family labels are inconsistent (case, plurals, typos). Without merging them,
+# "Halide" and "halides" would count as two families in the distinct-families metric.
+FAMILY_ALIASES = {
+    "argyrodite": "argyrodites",
+    "halide": "halides",
+    "chlorides": "halides",
+    "cholorides": "halides",
+    "fluorides": "halides",
+    "nitride": "nitrides",
+    "garnet-like": "garnet",
+    "perovskites": "perovskite",
+}
+
+
+def normalize_family(name):
+    key = str(name).strip()
+    low = key.lower()
+    if low in ("lgps", "nasicon", "lisicon", "lipon"):
+        return key.upper()
+    if low == "thio-lisicon":
+        return "thio-LISICON"
+    return FAMILY_ALIASES.get(low, low)
+
+
 def random_measurements_to_k(is_target, k, budget, seeds=2000, rng=None):
     """Measurements a random strategy needs to find k targets (inf if not within budget)."""
     rng = rng or np.random.default_rng(0)
@@ -76,7 +100,8 @@ def main():
     df["log_sigma"] = np.log10(df["sigma"])
     df["reduced"] = df["composition"].apply(reduced)
     df["host"] = df["composition"].apply(host_system)
-    df["family"] = df["family"].fillna("unknown").astype(str).str.strip()
+    df["family_obelix"] = df["family"].fillna("unknown").astype(str).str.strip()
+    df["family"] = df["family_obelix"].map(normalize_family)
     df["group_id"] = df["family"] + "|" + df["host"].fillna("?")
     df["has_cif"] = df["Cif ID"].astype(str).str.lower().eq("done")
 
@@ -97,7 +122,8 @@ def main():
     targets = df["is_target"].to_numpy()
     n_targets = int(targets.sum())
 
-    # Pick k so random needs a large share of the budget (median >= ~60% of budget).
+    # Pick k so random needs a large share of the budget: the smallest k whose median
+    # measurements-to-k is >= 60% of the budget (docs/EDA.md: k = 3, median 34 of 50).
     k_table = {}
     for k in range(1, min(n_targets, 15) + 1):
         runs = random_measurements_to_k(targets, k, BUDGET)
@@ -108,7 +134,7 @@ def main():
         }
     k_choice = next(
         (k for k, v in k_table.items()
-         if v["random_median"] is None or v["random_median"] >= 0.6 * BUDGET or v["random_success_rate"] < 0.8),
+         if v["random_median"] is None or v["random_median"] >= 0.6 * BUDGET),
         max(k_table),
     )
 
@@ -138,7 +164,8 @@ def main():
         "log_sigma_describe": df["log_sigma"].describe().round(3).to_dict(),
     }
 
-    cols = ["id", "composition", "reduced", "host", "family", "group_id", "space_group",
+    cols = ["id", "composition", "reduced", "host", "family", "family_obelix", "group_id", "space_group",
+            "Z", "a", "b", "c", "alpha", "beta", "gamma",
             "has_cif", "doi", "log_sigma", "sigma_upper_bound", "is_target"]
     (ROOT / "data").mkdir(exist_ok=True)
     (ROOT / "results").mkdir(exist_ok=True)

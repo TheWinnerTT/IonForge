@@ -1,0 +1,28 @@
+
+== main  pool=599 hits=30  threshold=-2.316  (105s)
+random analytic: to_k3=58.1 to_k5=96.8 to_k10=193.5
+strategy      to_k3 med [IQR]  reach%    to_k5 med [IQR]  hits@50  families@50
+random             47 [28-70]     54%        77 [59-110]        3            2
+heuristic          15 [11-19]    100%         26 [21-33]        9            2
+bo_cold           94 [39-inf]     32%       100 [43-inf]        2            1
+bo_prior            12 [7-28]     88%         18 [12-36]       16            3
+bo_prior_phit          12 [8-22]     90%         16 [12-30]       22            3
+
+== ood  pool=510 hits=40  threshold=-3.000  (117s)
+random analytic: to_k3=37.4 to_k5=62.3 to_k10=124.6
+strategy      to_k3 med [IQR]  reach%    to_k5 med [IQR]  hits@50  families@50
+random             38 [26-52]     72%         64 [47-77]        4            3
+heuristic          25 [20-30]    100%         44 [43-47]        6            2
+bo_cold            25 [14-39]     90%         35 [24-62]        7            1
+bo_prior            11 [8-17]     94%         15 [12-21]        9            3
+bo_prior_phit          12 [9-16]    100%         14 [12-25]        9            3
+
+== classic  pool=599 hits=100  threshold=-3.000  (132s)
+random analytic: to_k3=17.8 to_k5=29.7 to_k10=59.4
+strategy      to_k3 med [IQR]  reach%    to_k5 med [IQR]  hits@50  families@50
+random             18 [14-25]    100%         29 [22-37]        8            4
+heuristic             5 [4-7]    100%          10 [7-13]       25            3
+bo_cold             18 [7-27]     90%         28 [10-40]       10            2
+bo_prior              5 [4-7]    100%           8 [7-11]       29            4
+bo_prior_phit            5 [4-7]    100%           8 [7-11]       38            4
+done

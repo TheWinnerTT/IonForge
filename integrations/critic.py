@@ -17,7 +17,7 @@ SYSTEM = """You are a skeptical materials scientist reviewing one round of an au
 You receive the round record: active hypotheses, the experiment design the planner chose (and the alternatives it scored), the measurements (log10 conductivity in S/cm), and the running totals.
 
 Check:
-1. Do the conclusions follow from the measurements? Experimental noise is ~0.41 in log sigma; differences smaller than that are noise.
+1. Do the conclusions follow from the measurements? The OBELiX paper reports ~0.41 experimental uncertainty in log sigma and repeat measurements of the same formula scatter by ~0.66; treat differences below ~0.7 as noise.
 2. Is any claim overreaching (few measurements, one family, near-duplicate materials counted as separate discoveries)?
 3. Was a hypothesis contradicted by the data? If so, it must be reopened.
 4. Is the planner exploiting too early or exploring too long given the remaining budget?

@@ -1,0 +1,37 @@
+# TEMPLATE: rendered by agents/build.py
+spec_version: 1
+name: safety_officer
+description: Flags risks in a proposed experiment and decides if human sign-off is needed.
+
+executor:
+  type: omnigent
+  config:
+    harness: claude-sdk
+  model: __HAIKU__
+  auth:
+    type: api_key
+    api_key: ${ANTHROPIC_API_KEY}
+
+tools:
+  lab:
+    type: mcp
+    command: __PYTHON__
+    args: [-m, lab.mcp_server]
+    env:
+      IONFORGE_RUN_ID: "__RUN_ID__"
+      IONFORGE_TASK: "__TASK__"
+      IONFORGE_BUDGET: "__BUDGET__"
+      IONFORGE_SEED: "__SEED__"
+      IONFORGE_ANONYMIZE: "__ANON__"
+      IONFORGE_STRATEGY: "__STRATEGY__"
+    tools: [lab_status, measurements, record_decision]
+
+prompt: |
+  You are the Safety Officer. You own one decision: whether an experiment may proceed.
+  Check: the budget use is justified; the batch does not repeat measured ids; hazards of a
+  real synthesis (sulfides release H2S with moisture; toxic elements such as Tl, Cd, Be, Pb,
+  As, Hg, Se; air/moisture-sensitive precursors); claims are labelled unvalidated.
+  Return ONLY JSON: {"review": {"spec_id": str, "decision": "proceed|proceed_with_human_signoff|block",
+  "hazards": [..], "notes": str}}. Record it with record_decision(kind="review",
+  author="safety", payload=<review>). Human approval itself is enforced by an
+  Omnigent policy on measure(), not by you.

@@ -1,6 +1,14 @@
-pandas
+pandas<3
 numpy
 openpyxl
-pymatgen
+pymatgen==2026.3.23
+matminer==0.10.1
+setuptools<81
 requests
 python-dotenv
+scikit-learn
+scipy
+matplotlib
+mcp>=2
+httpx
+mp-api

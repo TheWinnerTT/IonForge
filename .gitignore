@@ -7,3 +7,9 @@ data/raw/
 data/papers/
 results/tmp/
 node_modules/
+# lab engine (A)
+data/cache/
+results/runs/*.jsonl
+agents/build/
+*.egg-info/
+.omnigent/

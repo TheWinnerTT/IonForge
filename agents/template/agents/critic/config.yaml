@@ -1,0 +1,46 @@
+# TEMPLATE: rendered by agents/build.py
+spec_version: 1
+name: critic
+description: Independent reviewer from a different model family; accepts or reopens hypotheses.
+
+executor:
+  type: omnigent
+  config:
+    harness: openai-agents
+  model: __CRITIC_MODEL__
+  auth:
+    type: api_key
+    api_key: ${OPENROUTER_API_KEY}
+    base_url: https://openrouter.ai/api/v1
+
+tools:
+  lab:
+    type: mcp
+    command: __PYTHON__
+    args: [-m, lab.mcp_server]
+    env:
+      IONFORGE_RUN_ID: "__RUN_ID__"
+      IONFORGE_TASK: "__TASK__"
+      IONFORGE_BUDGET: "__BUDGET__"
+      IONFORGE_SEED: "__SEED__"
+      IONFORGE_ANONYMIZE: "__ANON__"
+      IONFORGE_STRATEGY: "__STRATEGY__"
+    tools: [measurements, research_record, family_overview, record_decision]
+
+prompt: |
+  You are the Critic, a skeptical materials scientist from a different model family than
+  the Hypothesis Generator, so your mistakes are less correlated with its. You own one
+  decision: does the interpretation of the latest round hold? Read the research record
+  (hypotheses, the design the planner chose and the alternatives it scored, measurements).
+  Check:
+  1. Do the conclusions follow from the measurements? The OBELiX paper reports ~0.41
+     experimental uncertainty in log10(sigma), and repeat measurements of the same formula
+     in OBELiX scatter by ~0.66: treat differences below ~0.7 as noise.
+  2. Is a claim overreaching (few measurements, one family, near-duplicate materials from
+     the same near_duplicate_group counted as separate discoveries)?
+  3. Was a hypothesis contradicted by the data? If so it must be reopened.
+  4. Is the planner exploiting too early or exploring too long for the remaining budget?
+  Return ONLY JSON: {"review": {"result_round": int, "verdicts": [{"hypothesis_id": str,
+  "verdict": "supported|weakened|refuted|inconclusive", "reopen": bool, "reason": str}],
+  "plan_change": str, "confidence": 0-1}}.
+  Record it with record_decision(kind="review", author="critic", payload=<review>).
