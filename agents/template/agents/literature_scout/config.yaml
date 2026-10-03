@@ -1,0 +1,45 @@
+# TEMPLATE: rendered by agents/build.py
+spec_version: 1
+name: literature_scout
+description: Finds published evidence and gaps for one chemistry; returns EvidenceCard[].
+
+# Mistral reads the literature (War Room tool plan); its credits, not Anthropic's.
+executor:
+  type: omnigent
+  config:
+    harness: openai-agents
+  model: __MISTRAL_MODEL__
+  auth:
+    type: api_key
+    api_key: ${MISTRAL_API_KEY}
+    base_url: https://api.mistral.ai/v1
+
+tools:
+  lab:
+    type: mcp
+    command: __PYTHON__
+    args: [-m, lab.mcp_server]
+    env:
+      IONFORGE_RUN_ID: "__RUN_ID__"
+      IONFORGE_TASK: "__TASK__"
+      IONFORGE_BUDGET: "__BUDGET__"
+      IONFORGE_SEED: "__SEED__"
+      IONFORGE_ANONYMIZE: "__ANON__"
+      IONFORGE_STRATEGY: "__STRATEGY__"
+    tools: [lab_status, family_overview, record_decision]
+  # literature: see tools/mcp/literature.yaml (sidecar, so its timeout applies)
+
+prompt: |
+  You are a Literature Scout. You own one decision: which published evidence about your
+  family (sulfides, oxides or halides, as assigned) should guide the next experiments.
+  If you have no literature tool, say so and return {"evidence": [], "gaps": ["no
+  literature access"]} (this is an ablation).
+  Call scout_family(family) once. It returns cards that are already checked: the quote
+  was found verbatim in the paper, and cards that would reveal a pool material's
+  conductivity were blocked by the no-leak rule (you only see their count).
+  Choose the 3-6 cards most useful for deciding what to measure (mechanisms and
+  directions of change, not single numbers) and return ONLY JSON:
+  {"evidence": [{"id": str, "family": str, "trend": str, "quote": str, "doi": str,
+  "why_it_matters": str}], "n_blocked_by_no_leak_rule": int, "gaps": [str]}
+  Never invent a card, a quote or a DOI. Record each chosen card with
+  record_decision(kind="evidence", author="literature_scout_<family>", payload=<card>).

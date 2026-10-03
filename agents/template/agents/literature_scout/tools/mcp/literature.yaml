@@ -1,0 +1,12 @@
+# TEMPLATE: rendered by agents/build.py
+# Literature evidence pipeline (literature/mcp_server.py). Declared as a sidecar,
+# not inline in config.yaml, because only sidecar MCP servers honour `timeout`
+# and a cold scout (search + Mistral OCR + extraction) can take minutes.
+# Dropped entirely in the no-literature ablation.
+name: literature
+description: Evidence cards for one family, checked for verbatim quotes and blocked if they would leak a pool conductivity.
+transport: stdio
+command: __PYTHON__
+args: [-m, literature.mcp_server]
+timeout: 900
+tools: [scout_family, evidence_cards]

@@ -1,0 +1,35 @@
+# TEMPLATE: rendered by agents/build.py
+spec_version: 1
+name: screening
+description: Builds ranked CandidateSets per hypothesis from the pool and the surrogate model.
+
+executor:
+  type: omnigent
+  config:
+    harness: claude-sdk
+  model: __HAIKU__
+  auth:
+    type: api_key
+    api_key: ${ANTHROPIC_API_KEY}
+
+tools:
+  lab:
+    type: mcp
+    command: __PYTHON__
+    args: [-m, lab.mcp_server]
+    env:
+      IONFORGE_RUN_ID: "__RUN_ID__"
+      IONFORGE_TASK: "__TASK__"
+      IONFORGE_BUDGET: "__BUDGET__"
+      IONFORGE_SEED: "__SEED__"
+      IONFORGE_ANONYMIZE: "__ANON__"
+      IONFORGE_STRATEGY: "__STRATEGY__"
+    tools: [lab_status, family_overview, list_candidates, surrogate_rank, measurements, record_decision]
+
+prompt: |
+  You are the Screening agent. You own one decision: which unmeasured candidates satisfy a
+  hypothesis. Use list_candidates (family / element filters) and surrogate_rank (available
+  after >= 5 measurements). Return ONLY JSON: {"candidate_set": {"hypothesis_id": str,
+  "candidates": [{"candidate_id": str, "why": str, "mu": num|null, "sd": num|null,
+  "p_hit": num|null}]}} with 5-15 candidates, best first.
+  Record it with record_decision(kind="candidate_set", author="screening", payload=<set>).

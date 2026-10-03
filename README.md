@@ -15,7 +15,9 @@ Solid electrolytes would make lithium batteries non-flammable, but they need σ 
 - **Data:** [OBELiX](https://github.com/NRC-Mila/OBELiX), 599 solid electrolytes with experimentally measured room-temperature ionic conductivity. See [docs/EDA.md](docs/EDA.md).
 - **Oracle:** conductivity stays hidden in `oracle.measure()`; each call spends one unit of a **50-measurement budget** (10 rounds × 5).
 - **Target:** top 5% of log σ (log σ ≥ −2.316, 30 materials), because 16.7% of the pool clears 10⁻³ S/cm and random search would find those too quickly.
-- **Metrics:** measurements to find the first k = 3 targets (median + IQR over seeds), speed-up versus each baseline, and **distinct structural families found**.
+- **Metrics:** measurements to find the first k = 3 targets (median + IQR over seeds; k chosen in the EDA gate), speed-up versus each baseline with a bootstrap 90% interval, targets found within 50 measurements, and **distinct families found** (OBELiX family labels merged for case, plurals and typos: 36 families; 21 of the 30 targets are LGPS).
+- **Descriptors:** matminer (Magpie element properties, stoichiometry, valence orbitals) plus Li/anion/cell descriptors, 163 in total. Chosen over two alternatives by cross-validation and downstream BO (`results/feature_comparison.json`); the differences are small.
+- **Noise:** the OBELiX paper reports ~0.41 experimental uncertainty in log σ; repeat measurements of the same formula in OBELiX scatter by 0.66. The Critic treats differences below ~0.7 as noise.
 - **No-leak rule:** no evidence card may carry a conductivity value for a pool material or a doped variant of one. Blocked cards are counted and reported. See `literature/leak_filter.py`.
 
 | Strategy | Seeds | LLM |
@@ -23,7 +25,8 @@ Solid electrolytes would make lithium batteries non-flammable, but they need σ 
 | Random | 50 | No |
 | Expert heuristic | 50 | No |
 | BO (RF + UCB), cold start | 50 | No |
-| **BO + prior knowledge** (the fair comparison) | 50 | No |
+| **BO + prior knowledge** (the fair comparison): heuristic picks round 1, then RF + UCB | 50 | No |
+| BO + prior knowledge, probability-of-target acquisition | 50 | No |
 | **IonForge** | 5 | Yes |
 | Ablation 1: no literature | 3 | Yes |
 | Ablation 2: anonymized formulas | 3 | Yes |
@@ -52,20 +55,23 @@ flowchart LR
 
 | Agent | Decision it owns | Model |
 |---|---|---|
-| Literature Scout ×3 | What evidence exists for its family | Mistral + Claude Haiku |
+| Literature Scout ×3 | What evidence exists for its family | Mistral Small (agent), Mistral OCR, Claude Haiku (card extraction) |
 | Hypothesis Generator | Which hypotheses are worth testing | Claude Sonnet |
 | Screening | Which candidates satisfy each hypothesis | Claude Haiku + Python |
 | Experiment Planner | Which batch to measure (scores 3 designs per round) | Claude Sonnet |
-| Safety & approval | Whether spending is allowed | Omnigent policies + WhatsApp (Zavu) |
+| Safety & approval | Whether spending is allowed | Claude Haiku + Omnigent policy `measure_gate` (WhatsApp via Zavu / dashboard) |
 | Lab Runner | Runs the measurement | Code only |
-| Critic | Whether the conclusion holds | Non-Anthropic model via OpenRouter |
+| Critic | Whether the conclusion holds | Gemini via OpenRouter (non-Anthropic on purpose) |
+| PI (orchestrator) | Runs the loop; the only agent allowed to call `measure` | Claude Sonnet |
+
+**How it runs on Omnigent.** `agents/template/` is a directory bundle: the PI plus six sub-agents, each with its own MCP tool allow-list (`lab/mcp_server.py`, `literature/mcp_server.py`). Only the PI can call `measure`, and the Omnigent policy `policies/lab_policies.py::measure_gate` checks every call (rationale, hypothesis id and chosen design required, ≤ 5 per round, no repeated batch) and holds it until the scientist answers YES/NO on WhatsApp or presses Approve/Deny on the dashboard. Every decision goes to a JSONL research record (`results/runs/`) that is mirrored live to Supabase (`lab/sync.py`).
 
 ## Repository
 ```
-agents/        Omnigent agent specs (YAML)
+agents/        Omnigent bundle: template/ (PI + 6 sub-agents) rendered by build.py into build/<run_id>/
 policies/      spend cap, mandatory approval for measure(), loop detection
-lab/           oracle, features, surrogate, baselines, metrics
-literature/    openalex/arXiv, BrightData SERP, Mistral OCR, card extraction, citation check, no-leak filter
+lab/           oracle, MCP lab server, features, surrogate, baselines, metrics, analysis, Supabase sync
+literature/    openalex/arXiv, BrightData SERP, Mistral OCR, card extraction, citation check, no-leak filter, MCP server
 integrations/  critic (OpenRouter), zavu (WhatsApp approvals), elevenlabs (voice), supabase_sync
 supabase/      schema.sql + zavu-webhook edge function
 scripts/       EDA, demo data seed/clear
@@ -75,17 +81,32 @@ results/       JSON results and figures
 
 ## Reproduce
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env            # fill in keys
-git clone https://github.com/NRC-Mila/OBELiX data/raw/obelix
-python scripts/eda_obelix.py    # builds data/pool.csv
-python -m literature.run_scouts # evidence cards + no-leak report
-# lab campaigns: see lab/ (TODO)
+make setup                       # Python 3.12 venv with pinned deps (pymatgen 2026.3.23 + matminer 0.10.1) and Omnigent
+cp .env.example .env             # fill in keys
+make data                        # OBELiX -> data/pool.csv, results/eda_summary.json
+make features baselines compare  # descriptors, 5 baselines x 50 seeds, descriptor choice (no API key needed)
+make scouts                      # [API] evidence cards for sulfides / oxides / halides (cached)
+make live                        # [API] live demo with WhatsApp / dashboard approvals
+make bench SEED=0                # [API] one unattended IonForge campaign
+make ablations SEED=0            # [API] no-literature and anonymized ablations
+make analyze publish             # campaigns vs baselines; curves to the dashboard
 ```
+`make help` lists every target. Before the demo: `python scripts/clear_demo_data.py`.
 
 ## Results
-_TODO: discovery curves, measured speed-up vs BO + prior knowledge, ablations, blocked-card count._
+**Baselines** (task `main`, 50 seeds, median [IQR]; `results/baselines_main.json`):
+
+| Strategy | Measurements to 3 targets | Reached 3 within 50 | Targets in 50 | Families in 50 |
+|---|---|---|---|---|
+| Random | 47 [28–70] | 54% | 3 | 2 |
+| Expert heuristic | 15 [11–19] | 100% | 9 | 2 |
+| BO, cold start | 94 [39–∞] | 32% | 2 | 1 |
+| **BO + prior (UCB)** | **12 [7–28]** | 88% | 16 | 3 |
+| BO + prior (p_hit) | 12 [8–22] | 90% | **22** | 3 |
+
+Cold-start BO fails with any acquisition function we tried: five random first measurements rarely touch the LGPS region. With prior knowledge, BO finds many targets but only three families, mostly LGPS variants.
+
+**IonForge:** _TODO, campaigns pending (`make bench`, then `make analyze`)._
 
 ## Next experiment
 _TODO: top out-of-dataset candidates from Materials Project with uncertainty and applicability-domain check._

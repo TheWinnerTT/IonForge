@@ -1,0 +1,119 @@
+# IonForge PI — root of the Omnigent lab (directory bundle).
+# TEMPLATE: render with `python agents/build.py`; do not run directly.
+# Sub-agents live in ./agents/<name>/config.yaml and are discovered by Omnigent.
+# Keys come only from the environment (.env).
+
+spec_version: 1
+name: ionforge_pi
+description: >-
+  Principal Investigator of an agentic materials lab that searches for fast Li-ion
+  solid electrolytes with as few laboratory measurements as possible.
+
+executor:
+  type: omnigent
+  config:
+    harness: claude-sdk
+  model: __SONNET__
+  auth:
+    type: api_key
+    api_key: ${ANTHROPIC_API_KEY}
+
+async: true
+cancellable: true
+
+tools:
+  # The lab. The PI is the only agent whose allow-list contains `measure`
+  # (the deterministic Lab Runner); the measure_gate policy below holds every
+  # call until the scientist approves it on WhatsApp or the dashboard (live mode).
+  lab:
+    type: mcp
+    command: __PYTHON__
+    args: [-m, lab.mcp_server]
+    env:
+      IONFORGE_RUN_ID: "__RUN_ID__"
+      IONFORGE_TASK: "__TASK__"
+      IONFORGE_BUDGET: "__BUDGET__"
+      IONFORGE_SEED: "__SEED__"
+      IONFORGE_ANONYMIZE: "__ANON__"
+      IONFORGE_STRATEGY: "__STRATEGY__"
+    tools: [lab_status, family_overview, measurements, research_record, record_decision, measure]
+
+guardrails:
+  ask_timeout: 1800
+  policies:
+    measure_gate:
+      type: function
+      on: [tool_call]
+      function:
+        path: policies.lab_policies.measure_gate
+        arguments:
+          run_id: "__RUN_ID__"
+          approval: __APPROVAL__
+          max_batch: 5
+          approval_timeout_s: 900
+    no_ground_truth:
+      type: function
+      on: [tool_call]
+      function:
+        path: policies.lab_policies.no_target_leak
+    tool_call_cap:
+      type: function
+      function:
+        path: omnigent.policies.builtins.safety.max_tool_calls_per_session
+        arguments:
+          limit: 400
+    budget:
+      type: function
+      function:
+        path: omnigent.policies.builtins.cost.cost_budget
+        arguments:
+          max_cost_usd: __USD_CAP__
+          ask_thresholds_usd: [__USD_WARN__]
+          expensive_models: ["opus", "sonnet"]
+
+prompt: |
+  You are the Principal Investigator (PI) of IonForge, an autonomous materials lab.
+  Scientific question: can a coordinated agent lab find fast Li-ion solid electrolytes
+  with fewer laboratory measurements than random screening and agent-free Bayesian
+  optimization? Call `lab_status` first: it states the objective, hit threshold and budget.
+
+  Every measurement is expensive (in reality: synthesis + impedance spectroscopy, days).
+  A candidate's conductivity stays hidden until `measure` reveals it. You never guess
+  conductivities: you coordinate specialists and you are the only one who can execute
+  `measure`, after the planner has chosen and the safety officer has reviewed.
+
+  Your specialists (sub-agents) and the decision each one owns:
+  - literature_scout: what published evidence exists (EvidenceCard[])
+  - hypothesis_generator: which testable hypotheses are worth testing (Hypothesis[])
+  - screening: which candidates satisfy each hypothesis (CandidateSet)
+  - experiment_planner: which experiment to run, choosing among >= 2 designs (ExperimentSpec)
+  - safety_officer: whether the experiment may proceed and what needs human sign-off
+  - critic: whether the interpretation holds; can reopen a hypothesis (Review)
+
+  Discovery loop, one round per iteration, until the budget is spent:
+  1. Round 1 only: dispatch THREE literature_scout sessions IN PARALLEL, one per family:
+     sulfides, oxides (garnet/NASICON/perovskite/LISICON) and halides. Merge their cards.
+  2. hypothesis_generator turns evidence + all results so far into 2-4 hypotheses.
+  3. screening builds a CandidateSet per hypothesis (parallel sessions when > 1).
+  4. experiment_planner builds THREE competing designs every round: exploit (highest
+     predicted sigma), explore (highest uncertainty) and hypothesis test (the batch that best
+     confirms or refutes a hypothesis); scores them with `evaluate_designs`, picks one by
+     expected learning / cost, and records all three scores. Max 5 measurements per round.
+  5. safety_officer reviews the chosen spec.
+  6. You execute it: measure(candidate_ids, requested_by="lab_runner", rationale=<planner
+     rationale incl. rejected alternatives>, hypothesis_id=<spec hypothesis>,
+     design=<exploit|explore|hypothesis_test>). A policy holds the call until the human
+     scientist approves; if denied, ask the planner for another design.
+  7. critic reviews the result. If a hypothesis failed it is REOPENED: step 2 must revise
+     or replace it. State explicitly how the plan changed because of the result.
+  When the budget is exhausted: record a `next_step` with the best candidates found, what
+  was learned, what remains uncertain, and the next experiment you would request.
+
+  Hand-offs are JSON objects passed verbatim between agents (include the previous agent's
+  JSON in your message to the next one) and every one is appended to the shared research
+  record with `record_decision` (kinds: evidence, hypothesis, candidate_set,
+  experiment_spec, review, next_step); the live dashboard reads that record.
+  Tell each literature_scout which family it owns: sulfides, oxides or halides. Use candidate ids (C###) everywhere. Keep rounds
+  short: agents return JSON, not essays. Every hypothesis is AI-generated and unvalidated.
+  Work autonomously round after round; do not stop to ask the user anything except
+  through the approval gate.

@@ -10,7 +10,7 @@ Reproduce: `python scripts/eda_obelix.py` → `data/pool.csv`, `results/eda_summ
 | **Target used** | **top 5% of log σ: log σ ≥ −2.316** (30 targets) |
 | Unique reduced formulas | 508 |
 | Near-duplicate groups (family + host chemical system, dopants < 4 at.% ignored) | 203, of which 74 have more than one member |
-| Families (OBELiX labels) | 43 |
+| Families | 36 after merging OBELiX label variants (case, plurals, typos: "Halide"/"halides", "argyrodite"/"argyrodites"); 43 raw labels kept in `family_obelix` |
 | Families among targets | 6: LGPS 21, unknown 3, NASICON 2, argyrodites 2, thio-LISICON 1, antiperovskite 1 |
 
 ## Random baseline (budget 50, 2000 simulations)
@@ -23,7 +23,7 @@ Reproduce: `python scripts/eda_obelix.py` → `data/pool.csv`, `results/eda_summ
 | 4 | 23% | 39 |
 | 5 | 11% | 41 |
 
-**Proposal: k = 3.** Random needs ~34 of the 50 measurements and fails half the time, which leaves room to show a speed-up. When a strategy does not reach k within the budget, record it as censored (51) and report the success rate next to the median.
+**k = 3** (the script picks the smallest k whose random median is ≥ 60% of the budget). Random needs ~34 of the 50 measurements and fails half the time, which leaves room to show a speed-up. When a strategy does not reach k within the budget, record it as censored (51) and report the success rate next to the median.
 
 ## Notes
 - 21 of the 30 targets are LGPS-type, so "superionic found" alone rewards hammering one family. That is why **distinct families found** is the secondary metric.
