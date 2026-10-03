@@ -1,6 +1,6 @@
 """Optional (first cut if late): spoken round briefings with ElevenLabs.
 
-Claude Haiku (via integrations/llm.py: OpenRouter by default) summarizes the round in ~50 words -> ElevenLabs TTS -> mp3 in
+The round is summarized in ~50 words (integrations/llm.py, EXTRACTOR_ROUTE) -> ElevenLabs TTS -> mp3 in
 Supabase Storage (bucket `briefings`, public) -> audio_url on a `briefing` event.
 """
 import json

@@ -164,3 +164,5 @@ create policy "public read" on agent_activity for select to anon, authenticated 
 alter publication supabase_realtime add table agent_activity;
 
 -- Judge-triggered rounds: see supabase/migrations/003_judge_runs.sql (run_requests, run_requests_public, runner_status).
+
+-- Spoken dashboard items: see supabase/migrations/004_audio_clips.sql (audio_clips).
