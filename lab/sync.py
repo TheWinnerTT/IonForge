@@ -139,3 +139,20 @@ def _review(run_id: str, review: dict) -> list[str]:
         if v.get("reopen"):
             reopened.append(h)
     return reopened
+
+
+# --- live campaign map -------------------------------------------------------------
+# One row per agent action (tool call), so the dashboard can show who is working right
+# now and replay a finished campaign step by step. Written from a background thread:
+# the agent never waits on Supabase, and a failed write is dropped (never breaks the lab).
+
+def activity(run_id: str, agent: str, state: str, action: str, tool: str,
+             round_: int | None = None, detail: dict[str, Any] | None = None) -> None:
+    """state: working | done | waiting."""
+    if not enabled():
+        return
+    import threading
+
+    row = {"run_id": run_id, "round": round_, "agent": agent, "state": state,
+           "action": action[:300], "tool": tool, "detail": detail or {}}
+    threading.Thread(target=_safe(lambda: db.insert("agent_activity", row)), daemon=True).start()

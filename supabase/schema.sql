@@ -140,3 +140,25 @@ select
   count(*) filter (where blocked_leak) as blocked,
   count(*) filter (where verified and not blocked_leak) as verified
 from evidence;
+
+-- Live campaign map (also in supabase/migrations/002_agent_activity.sql)
+create table if not exists agent_activity (
+  id bigserial primary key,
+  run_id text not null,
+  round int,
+  agent text,
+  state text,
+  action text,
+  tool text,
+  detail jsonb,
+  created_at timestamptz default now()
+);
+create index if not exists agent_activity_run_idx on agent_activity(run_id, created_at);
+create or replace view agent_status as
+select distinct on (run_id, agent) run_id, agent, round, state, action, tool, created_at
+from agent_activity
+order by run_id, agent, created_at desc;
+alter table agent_activity enable row level security;
+drop policy if exists "public read" on agent_activity;
+create policy "public read" on agent_activity for select to anon, authenticated using (true);
+alter publication supabase_realtime add table agent_activity;
