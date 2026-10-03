@@ -15,6 +15,10 @@ measure_gate enforces, on every call to the lab's `measure` tool:
                    via Zavu, and a wait until the scientist answers YES/NO on WhatsApp
                    or presses Approve/Deny on the dashboard. Falls back to "ui" when
                    Supabase is not configured, so nothing is ever approved silently.
+       "dashboard" judge-triggered rounds: like "whatsapp" but no message is sent (approve
+                   on the dashboard only), and fail-closed: if Supabase is unavailable or the
+                   judge runner cancelled the round, measure() is denied instead of ASK
+                   (a headless session has nobody to answer Omnigent's prompt).
        "ui"        Omnigent's own approval prompt (ASK).
        "every_n"   ASK every N rounds.
        "never"     benchmark campaigns: auto-approved, still logged in `approvals`.
@@ -30,7 +34,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 MEASURE_TOOL = "measure"
 DESIGNS = ("exploit", "explore", "hypothesis_test")
-MODES = ("whatsapp", "ui", "every_n", "never")
+MODES = ("whatsapp", "dashboard", "ui", "every_n", "never")
 
 
 def _tool_name(event: dict) -> str:
@@ -93,21 +97,45 @@ def measure_gate(run_id: str = "unknown", approval: str = "ui", every_n: int = 3
             return {"result": "ALLOW", "state_updates": updates}
         if approval == "every_n" and (round_ - 1) % max(every_n, 1):
             return {"result": "ALLOW", "state_updates": updates}
-        if approval == "whatsapp":
-            verdict = _whatsapp_decision(run_id, round_, design, len(ids), names, rationale, approval_timeout_s)
+        if approval == "dashboard" and _judge_round_cancelled(run_id):
+            return {"result": "DENY", "reason": "This judge round was cancelled (no approval in time). "
+                                                "Do not measure again; record nothing more and end the round."}
+        if approval in ("whatsapp", "dashboard"):
+            verdict = _whatsapp_decision(run_id, round_, design, len(ids), names, rationale, approval_timeout_s,
+                                         notify=approval == "whatsapp")
             if verdict == "approved":
                 return {"result": "ALLOW", "state_updates": updates}
             if verdict in ("denied", "timeout"):
                 reason = ("The scientist denied this experiment." if verdict == "denied"
-                          else f"No human decision within {approval_timeout_s // 60} min; experiment not run.")
+                          else f"No human decision within {_duration(approval_timeout_s)}; experiment not run.")
                 return {"result": "DENY", "reason": reason}
-            # verdict == "unavailable": fall through to Omnigent's own prompt
+            if approval == "dashboard":  # fail closed: nobody can answer an ASK in a headless judge round
+                return {"result": "DENY", "reason": "The approval service is unavailable; experiment not run."}
+            # verdict == "unavailable" in "whatsapp" mode: fall through to Omnigent's own prompt
         return {"result": "ASK", "reason": f"The lab wants to {request}", "state_updates": updates}
 
     return evaluate
 
 
-def _whatsapp_decision(run_id, round_, design, n, names, rationale, timeout_s) -> str:
+def _duration(seconds: int) -> str:
+    return f"{seconds} s" if seconds < 120 else f"{seconds // 60} min"
+
+
+def _judge_round_cancelled(run_id: str) -> bool:
+    """True when scripts/judge_runner.py marked this campaign's current request as finished
+    without success (expired / denied / failed / cancelled). Never raises."""
+    try:
+        from integrations.supabase_sync import db
+        if not db.enabled:
+            return False
+        rows = db.select("run_requests", {"run_id": run_id}, columns="status", order="claimed_at.desc", limit=1)
+        return bool(rows) and rows[0]["status"] in ("expired", "denied", "failed", "cancelled")
+    except Exception as exc:
+        print(f"[measure_gate] could not read run_requests: {exc}", file=sys.stderr)
+        return False
+
+
+def _whatsapp_decision(run_id, round_, design, n, names, rationale, timeout_s, notify=True) -> str:
     """'approved' | 'denied' | 'timeout' | 'unavailable' (Supabase not configured)."""
     try:
         from integrations.supabase_sync import db
@@ -118,7 +146,7 @@ def _whatsapp_decision(run_id, round_, design, n, names, rationale, timeout_s) -
     if not db.enabled:
         return "unavailable"
     try:
-        row = request_approval(run_id, round_, design, n, names, rationale[:300])
+        row = request_approval(run_id, round_, design, n, names, rationale[:300], notify=notify)
         return wait_for_decision(row["id"], timeout_s=timeout_s)
     except Exception as exc:
         print(f"[measure_gate] approval request failed: {exc}", file=sys.stderr)

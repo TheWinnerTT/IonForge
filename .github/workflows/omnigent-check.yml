@@ -1,0 +1,36 @@
+# Step 0 of running judge rounds in GitHub Actions: can Omnigent install and render a
+# round on a Linux runner with no interactive login? Dry run only: no model is called,
+# no secret is needed (placeholder keys satisfy build.py's checks).
+name: omnigent-check
+on:
+  workflow_dispatch:
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MISTRAL_API_KEY: placeholder
+      OPENROUTER_API_KEY: placeholder
+      MISTRAL_API_KEY_CAMPAIGNS: placeholder
+      OPENROUTER_API_KEY_CAMPAIGNS: placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Python env
+        run: |
+          uv venv --python 3.12
+          uv pip install -r requirements.txt
+          uv pip install -e .
+      - name: Install Omnigent
+        run: |
+          uv tool install --python 3.12 omnigent
+          ls -la ~/.local/bin/omnigent
+          ~/.local/bin/omnigent --version
+      - name: Register providers
+        run: .venv/bin/python scripts/setup_omnigent_providers.py
+      - name: Render a judge round (dry run)
+        run: .venv/bin/python scripts/run_campaign.py --variant live_judges --budget 10 --max-rounds 1 --dry-run
+      - name: Omnigent starts headless?
+        run: |
+          timeout 60 ~/.local/bin/omnigent diagnose || true

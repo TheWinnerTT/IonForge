@@ -65,7 +65,7 @@ guardrails:
           run_id: "__RUN_ID__"
           approval: __APPROVAL__
           max_batch: 5
-          approval_timeout_s: 900
+          approval_timeout_s: __APPROVAL_TIMEOUT__
     no_ground_truth:
       type: function
       on: [tool_call]

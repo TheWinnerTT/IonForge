@@ -162,3 +162,5 @@ alter table agent_activity enable row level security;
 drop policy if exists "public read" on agent_activity;
 create policy "public read" on agent_activity for select to anon, authenticated using (true);
 alter publication supabase_realtime add table agent_activity;
+
+-- Judge-triggered rounds: see supabase/migrations/003_judge_runs.sql (run_requests, run_requests_public, runner_status).
