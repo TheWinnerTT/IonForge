@@ -47,6 +47,22 @@ def search_openalex(query, n=25):
     return out
 
 
+def work_by_doi(doi):
+    """OpenAlex record for one DOI (abstract + open-access PDF), or None if unknown."""
+    params = {"mailto": os.getenv("OPENALEX_MAILTO")} if os.getenv("OPENALEX_MAILTO") else {}
+    r = requests.get(f"https://api.openalex.org/works/doi:{doi}", params=params, timeout=30)
+    if r.status_code != 200:
+        return None
+    w = r.json()
+    loc = w.get("best_oa_location") or {}
+    return {
+        "title": w.get("title"),
+        "year": w.get("publication_year"),
+        "pdf": loc.get("pdf_url"),
+        "abstract": _abstract(w.get("abstract_inverted_index")),
+    }
+
+
 def _abstract(inverted):
     if not inverted:
         return ""
