@@ -13,9 +13,10 @@ CAMPAIGN := "Run the full discovery campaign until the measurement budget is spe
 help:             ## list targets
 	@grep -E '^[a-z-]+:.*##' Makefile | sed 's/:.*##/ —/'
 
-setup:            ## Python 3.12 venv with pinned deps + Omnigent CLI
+setup:            ## Python 3.12 venv with pinned deps + Omnigent CLI + model providers
 	uv venv --python 3.12 && uv pip install -r requirements.txt && uv pip install -e .
 	uv tool install --python 3.12 omnigent
+	$(PY) scripts/setup_omnigent_providers.py
 
 data:             ## OBELiX -> data/pool.csv + results/eda_summary.json (gate f0-7)
 	[ -d data/raw/obelix ] || git clone --depth 1 https://github.com/NRC-Mila/OBELiX data/raw/obelix
@@ -37,6 +38,7 @@ agents:           ## render the Omnigent bundles for TASK and SEED
 	$(PY) agents/build.py --variant all --task $(TASK) --seed $(SEED)
 
 live:             ## [API] live demo: approval on WhatsApp / dashboard before each measurement
+	-$(PY) -m lab.publish --check-demo
 	$(LOAD_ENV); $(OMNI) run $$($(PY) agents/build.py --variant live --task $(TASK))
 
 bench:            ## [API] one unattended IonForge campaign (approvals auto-granted and logged)
@@ -49,7 +51,7 @@ ablations:        ## [API] Ablation 1 (no literature) and Ablation 2 (anonymized
 analyze:          ## agent campaigns vs baselines: speed-up, hits, families
 	$(PY) -m lab.analyze --task $(TASK)
 
-publish:          ## push discovery curves to the dashboard (Supabase `curves`)
+publish:          ## push discovery curves to the dashboard (refuses while fake demo rows exist)
 	$(PY) -m lab.publish --task $(TASK)
 
 reproduce: data features baselines compare analyze   ## everything that needs no API key

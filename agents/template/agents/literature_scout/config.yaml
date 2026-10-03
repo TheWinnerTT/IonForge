@@ -10,9 +10,8 @@ executor:
     harness: openai-agents
   model: __MISTRAL_MODEL__
   auth:
-    type: api_key
-    api_key: ${MISTRAL_API_KEY}
-    base_url: https://api.mistral.ai/v1
+    type: provider
+    name: mistral   # registered by scripts/setup_omnigent_providers.py
 
 tools:
   lab:

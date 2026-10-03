@@ -64,6 +64,8 @@ flowchart LR
 | Critic | Whether the conclusion holds | Gemini via OpenRouter (non-Anthropic on purpose) |
 | PI (orchestrator) | Runs the loop; the only agent allowed to call `measure` | Claude Sonnet |
 
+**Models and keys.** Claude (Sonnet 5.5, Haiku 4.5) and the Critic (Gemini) are reached through OpenRouter; the Literature Scouts through Mistral. `scripts/setup_omnigent_providers.py` registers them as Omnigent providers that read keys from `.env` (never stored in bundles or in Omnigent). The live demo and the overnight campaigns use separate OpenRouter keys, each with its own credit limit, so a campaign can never spend the demo budget.
+
 **How it runs on Omnigent.** `agents/template/` is a directory bundle: the PI plus six sub-agents, each with its own MCP tool allow-list (`lab/mcp_server.py`, `literature/mcp_server.py`). Only the PI can call `measure`, and the Omnigent policy `policies/lab_policies.py::measure_gate` checks every call (rationale, hypothesis id and chosen design required, ≤ 5 per round, no repeated batch) and holds it until the scientist answers YES/NO on WhatsApp or presses Approve/Deny on the dashboard. Every decision goes to a JSONL research record (`results/runs/`) that is mirrored live to Supabase (`lab/sync.py`).
 
 ## Repository

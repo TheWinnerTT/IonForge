@@ -1,11 +1,11 @@
-"""Paper text -> EvidenceCards (family-level trends only), using Claude Haiku."""
+"""Paper text -> EvidenceCards (family-level trends only), using Claude Haiku via OpenRouter (or Anthropic)."""
 import hashlib
 import json
-import os
 import re
 
-import requests
 from dotenv import load_dotenv
+
+from integrations.llm import complete
 
 load_dotenv()
 
@@ -25,26 +25,11 @@ MAX_CHARS = 60_000
 
 
 def extract_cards(paper, text, scout_family, n_max=4):
-    key = os.getenv("ANTHROPIC_API_KEY")
-    if not key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set")
     user = (
         f"Scout family: {scout_family}\nTitle: {paper.get('title')}\nDOI: {paper.get('doi')}\n"
         f"Return at most {n_max} cards.\n\n--- PAPER TEXT ---\n{text[:MAX_CHARS]}"
     )
-    r = requests.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-        json={
-            "model": os.getenv("EXTRACTOR_MODEL", "claude-haiku-4-5-20251001"),
-            "max_tokens": 1500,
-            "system": [{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}],
-            "messages": [{"role": "user", "content": user}],
-        },
-        timeout=120,
-    )
-    r.raise_for_status()
-    raw = "".join(b.get("text", "") for b in r.json()["content"])
+    raw = complete(SYSTEM, user, max_tokens=1500)
     match = re.search(r"\{.*\}", raw, re.S)
     cards = json.loads(match.group(0)).get("cards", []) if match else []
     out = []
