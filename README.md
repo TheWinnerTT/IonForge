@@ -57,14 +57,14 @@ flowchart LR
 |---|---|---|
 | Literature Scout ×3 | What evidence exists for its family | Mistral Small (agent, card extraction), Mistral OCR |
 | Hypothesis Generator | Which hypotheses are worth testing | Mistral Large |
-| Screening | Which candidates satisfy each hypothesis | Mistral Small + RF surrogate |
+| Screening | Which candidates satisfy each hypothesis | Mistral Large + RF surrogate |
 | Experiment Planner | Which batch to measure (scores 3 designs per round) | Mistral Large |
 | Safety & approval | Whether spending is allowed | Mistral Small + Omnigent policy `measure_gate` (WhatsApp via Zavu / dashboard) |
 | Lab Runner | Runs the measurement | Code only |
 | Critic | Whether the conclusion holds | Claude Sonnet via OpenRouter (different family from the hypothesis generator, on purpose) |
 | PI (orchestrator) | Runs each round; the only agent allowed to call `measure` | Mistral Large |
 
-**Models and keys.** Mistral is the lab's engine: Mistral Large for the decisions (PI, Hypothesis Generator, Experiment Planner) and Mistral Small for tool-driven work (Screening, Safety, Literature Scouts). The Critic is Claude Sonnet through OpenRouter, deliberately a different model family from the hypothesis generator. Every agent runs on Omnigent's lean `openai-agents` harness. `scripts/setup_omnigent_providers.py` registers the providers, which read keys from `.env` (never stored in bundles or in Omnigent). The live demo and the overnight campaigns use separate Mistral and OpenRouter keys, so a campaign can never spend the demo budget.
+**Models and keys.** Mistral is the lab's engine: Mistral Large for the decisions and the candidate selection (PI, Hypothesis Generator, Screening, Experiment Planner) and Mistral Small for Safety and the Literature Scouts. The lab server validates every decision (no unknown candidate ids, no closing a campaign early or without a critic review). The Critic is Claude Sonnet through OpenRouter, deliberately a different model family from the hypothesis generator. Every agent runs on Omnigent's lean `openai-agents` harness. `scripts/setup_omnigent_providers.py` registers the providers, which read keys from `.env` (never stored in bundles or in Omnigent). The live demo and the overnight campaigns use separate Mistral and OpenRouter keys, so a campaign can never spend the demo budget.
 
 **One session per round.** `scripts/run_campaign.py` runs each round of the discovery loop as a fresh Omnigent session. The research record carries the state between rounds, so the PI's context never grows, a failed round can be retried, and no session approaches Omnigent's 30-minute headless limit. The driver stops when the budget is spent or after two rounds without progress. Each round session also has a hard spend cap enforced by an Omnigent cost policy.
 

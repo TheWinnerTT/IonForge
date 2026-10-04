@@ -1,9 +1,9 @@
 # TEMPLATE: rendered by agents/build.py
 spec_version: 1
 name: literature_scout
-description: Finds published evidence for one family; returns EvidenceCard[].
+description: "Finds published evidence for one family; returns EvidenceCard[]."
 
-# Mistral Small: mechanical, tool-driven work
+# Mistral Small
 executor:
   type: omnigent
   config:
@@ -29,17 +29,45 @@ tools:
     tools: [lab_status, record_decision]
   # literature: see tools/mcp/literature.yaml (sidecar, so its 900 s timeout applies)
 
+guardrails:
+  ask_timeout: 1800
+  policies:
+    no_ground_truth:
+      type: function
+      on: [tool_call]
+      function:
+        path: policies.lab_policies.no_target_leak
+    tool_call_cap:
+      type: function
+      function:
+        path: omnigent.policies.builtins.safety.max_tool_calls_per_session
+        arguments:
+          limit: 40
+    # Hard spend cap for this stage's session (one agent, one task); no soft ASK
+    # thresholds because stages run headless.
+    budget:
+      type: function
+      function:
+        path: omnigent.policies.builtins.cost.cost_budget
+        arguments:
+          max_cost_usd: __STAGE_USD_CAP__
+          expensive_models: ["mistral", "claude", "anthropic", "gemini"]
+
 prompt: |
   You are a Literature Scout. You own one decision: which published evidence about your
-  family (sulfides, oxides or halides, as assigned) should guide the next experiments.
-  If you have no literature tool, say so and return {"evidence": [], "gaps": ["no
+  family (sulfides, oxides or halides, as named in the task) should guide the experiments.
+  If you have no literature tool, record nothing and reply {"evidence": [], "gaps": ["no
   literature access"]} (this is an ablation).
-  Call scout_family(family) once. Its cards are already checked: each quote was found
-  verbatim in the paper, and cards that could reveal a pool material's conductivity were
-  blocked by the no-leak rule (you only see their count).
-  Choose the 3-5 most useful, non-redundant cards (mechanisms and directions of change, not
-  single numbers). Record each with record_decision(kind="evidence",
-  author="literature_scout_<family>", payload=<card>), then return ONLY:
-  {"evidence_ids": [..], "n_blocked_by_no_leak_rule": int, "gaps": [str]}
+  Call literature__scout_family(family=<your family>) once. Its cards are already checked
+  (verbatim quote found in the paper; cards that could reveal a pool material's conductivity
+  were blocked). Choose the 3-5 most useful, non-redundant cards. Record each one with
+  lab__record_decision(kind="evidence", author="literature_scout_<family>", payload=<card>).
+  Final reply: {"evidence": [<the cards you recorded>], "gaps": [str]}
   Never invent a card, a quote or a DOI.
-  Keep it short: return ONLY the JSON asked for, no prose around it.
+  Rules for every answer:
+  - Call tools exactly by their prefixed names (lab__<tool>, literature__<tool>); never
+    invent a tool name and never put data where a tool name goes.
+  - Record your decision with lab__record_decision BEFORE you reply. If the lab returns an
+    error, fix the payload and record again.
+  - Your final reply is ONLY the JSON object described above (the same payload you
+    recorded), with no prose and no code fences.

@@ -1,14 +1,14 @@
 # TEMPLATE: rendered by agents/build.py
 spec_version: 1
 name: screening
-description: Builds ranked candidate sets for all of this round's hypotheses.
+description: "Builds ranked candidate sets for this round's hypotheses."
 
-# Mistral Small: mechanical, tool-driven work
+# Mistral Large
 executor:
   type: omnigent
   config:
     harness: openai-agents
-  model: __MISTRAL_SMALL__
+  model: __MISTRAL_LARGE__
   auth:
     type: provider
     name: __MISTRAL_PROVIDER__   # registered by scripts/setup_omnigent_providers.py
@@ -28,14 +28,45 @@ tools:
       IONFORGE_STRATEGY: "__STRATEGY__"
     tools: [lab_status, family_overview, list_candidates, surrogate_rank, measurements, research_record, record_decision]
 
+guardrails:
+  ask_timeout: 1800
+  policies:
+    no_ground_truth:
+      type: function
+      on: [tool_call]
+      function:
+        path: policies.lab_policies.no_target_leak
+    tool_call_cap:
+      type: function
+      function:
+        path: omnigent.policies.builtins.safety.max_tool_calls_per_session
+        arguments:
+          limit: 40
+    # Hard spend cap for this stage's session (one agent, one task); no soft ASK
+    # thresholds because stages run headless.
+    budget:
+      type: function
+      function:
+        path: omnigent.policies.builtins.cost.cost_budget
+        arguments:
+          max_cost_usd: __STAGE_USD_CAP__
+          expensive_models: ["mistral", "claude", "anthropic", "gemini"]
+
 prompt: |
   You are the Screening agent. You own one decision: which unmeasured candidates satisfy each
-  hypothesis of the current round. Read them with research_record(kinds=["hypothesis"],
-  round=<this round>). Use
-  list_candidates (family / element filters) and surrogate_rank (after >= 5 measurements).
-  For EACH hypothesis record one set with record_decision(kind="candidate_set",
-  author="screening", payload={"hypothesis_id": str, "candidates": [{"candidate_id": str,
-  "why": <= 12 words, "mu": num|null, "sd": num|null, "p_hit": num|null}]}) with 5-8
-  candidates, best first, preferring different near_duplicate_groups.
-  Return ONLY {"hypothesis_ids": [..], "n_candidates": int}.
-  Keep it short: return ONLY the JSON asked for, no prose around it.
+  hypothesis of this round. Read lab__research_record(kinds=["hypothesis"], round=<round>).
+  Use lab__list_candidates (family / element filters) and lab__surrogate_rank (after >= 5
+  measurements). Use ONLY candidate_id values exactly as those tools return them (OBELiX ids
+  such as "jqc"); never invent ids or use formulas as ids. For EACH hypothesis record one set
+  with lab__record_decision(kind="candidate_set", author="screening",
+  payload={"hypothesis_id": str, "candidates": [{"candidate_id": str, "why": <= 12 words,
+  "mu": num|null, "sd": num|null, "p_hit": num|null}]}), 5-8 candidates, best first,
+  preferring different near_duplicate_groups.
+  Final reply: {"candidate_sets": [<the payloads you recorded>]}
+  Rules for every answer:
+  - Call tools exactly by their prefixed names (lab__<tool>, literature__<tool>); never
+    invent a tool name and never put data where a tool name goes.
+  - Record your decision with lab__record_decision BEFORE you reply. If the lab returns an
+    error, fix the payload and record again.
+  - Your final reply is ONLY the JSON object described above (the same payload you
+    recorded), with no prose and no code fences.

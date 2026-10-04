@@ -6,7 +6,9 @@ OMNI := $(HOME)/.local/bin/omnigent
 TASK ?= main
 SEED ?= 0
 ROUNDS ?= 3
-LOAD_ENV := set -a; [ -f .env ] && source .env; set +a; eval "$$($(PY) scripts/openrouter_keys.py --export)"
+# SSL_CERT_FILE: some Python builds on macOS ship without CA certificates; Omnigent then
+# cannot fetch model prices and its cost policy denies every call.
+LOAD_ENV := set -a; [ -f .env ] && source .env; set +a; export SSL_CERT_FILE="$${SSL_CERT_FILE:-$$($(PY) -m certifi)}"; eval "$$($(PY) scripts/openrouter_keys.py --export)"
 
 .PHONY: help setup data features baselines compare agents scouts smoke live bench ablations campaigns judge-runner voice analyze publish reproduce clean-runs
 
@@ -51,11 +53,8 @@ ablations:        ## [API] Ablation 1 (no literature) and Ablation 2 (anonymized
 	$(LOAD_ENV); $(PY) scripts/run_campaign.py --variant ablation_nolit --task $(TASK) --seed $(SEED)
 	$(LOAD_ENV); $(PY) scripts/run_campaign.py --variant ablation_anon --task $(TASK) --seed $(SEED)
 
-campaigns:        ## [API] overnight plan: IonForge x5 seeds, each ablation x3, interleaved by seed
-	for s in 0 1 2 3 4; do \
-	  $(MAKE) --no-print-directory bench SEED=$$s; \
-	  if [ $$s -lt 3 ]; then $(MAKE) --no-print-directory ablations SEED=$$s; fi; \
-	done
+campaigns:        ## [API] overnight plan: 2 parallel lanes, IonForge x5 first, then each ablation x3 (resumable)
+	$(LOAD_ENV); $(PY) scripts/run_all_campaigns.py --task $(TASK)
 
 judge-runner:     ## [API] serve the dashboard's "Run one round" button (needs JUDGE_RUNS=on in .env)
 	$(LOAD_ENV); $(PY) scripts/judge_runner.py

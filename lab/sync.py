@@ -106,7 +106,7 @@ def decision(run_id: str, round_: int, kind: str, author: str, payload: dict[str
 
 def _score(design: dict) -> float | None:
     s = design.get("scores") or {}
-    for key in ("learning_per_cost", "expected_learning", "expected_hits"):
+    for key in ("learning_per_cost", "expected_learning", "expected_hits", "prior_score"):
         if isinstance(s.get(key), (int, float)):
             return float(s[key])
     return None

@@ -170,9 +170,11 @@ class Oracle:
 
     def log_event(self, event: str, **payload) -> None:
         """Agents append decisions (hypotheses, plans, reviews) to the same record."""
-        # Reviews and next steps judge the round just measured; everything else
-        # prepares the next one.
-        round_ = self.round if event in ("review", "next_step") else self.round + 1
+        # The critic's review and the final next step judge the round just measured;
+        # everything else (including the safety review before measuring) belongs to
+        # the round being prepared.
+        critic = event == "review" and payload.get("author") == "critic"
+        round_ = self.round if critic or event == "next_step" else self.round + 1
         self._log({"event": event, "round": round_, **payload})
         if self.record_path and "payload" in payload:
             sync.decision(self.run_id, round_, event, payload.get("author", "unknown"), payload["payload"])

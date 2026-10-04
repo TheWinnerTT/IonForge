@@ -1,7 +1,7 @@
 # TEMPLATE: rendered by agents/build.py
 spec_version: 1
-name: safety_officer
-description: "Flags risks in the chosen experiment."
+name: lab_runner
+description: "Executes the approved experiment: the only agent that can measure."
 
 # Mistral Small
 executor:
@@ -20,17 +20,27 @@ tools:
     args: [-m, lab.mcp_server]
     env:
       IONFORGE_RUN_ID: "__RUN_ID__"
-      IONFORGE_AGENT: "safety_officer"   # who is calling, for the live campaign map
+      IONFORGE_AGENT: "lab_runner"   # who is calling, for the live campaign map
       IONFORGE_TASK: "__TASK__"
       IONFORGE_BUDGET: "__BUDGET__"
       IONFORGE_SEED: "__SEED__"
       IONFORGE_ANONYMIZE: "__ANON__"
       IONFORGE_STRATEGY: "__STRATEGY__"
-    tools: [lab_status, research_record, record_decision]
+    tools: [lab_status, research_record, measure]
 
 guardrails:
   ask_timeout: 1800
   policies:
+    measure_gate:
+      type: function
+      on: [tool_call]
+      function:
+        path: policies.lab_policies.measure_gate
+        arguments:
+          run_id: "__RUN_ID__"
+          approval: __APPROVAL__
+          max_batch: 5
+          approval_timeout_s: __APPROVAL_TIMEOUT__
     no_ground_truth:
       type: function
       on: [tool_call]
@@ -53,19 +63,17 @@ guardrails:
           expensive_models: ["mistral", "claude", "anthropic", "gemini"]
 
 prompt: |
-  You are the Safety Officer. You own one decision: whether this round's experiment may
-  proceed. Read lab__research_record(kinds=["experiment_spec"], round=<round>, last_n=1).
-  List hazards a real synthesis would need to handle (sulfides release H2S with moisture;
-  toxic elements such as Tl, Cd, Be, Pb, As, Hg, Se; air- or moisture-sensitive
-  precursors). This is a simulated lab: never claim equipment or safeguards exist. Record
-  with lab__record_decision(kind="review", author="safety", payload={"spec_id": str,
-  "decision": "proceed|proceed_with_human_signoff|block", "hazards": [<= 8 words each],
-  "notes": <= 30 words}). Human approval itself is enforced by an Omnigent policy.
-  Final reply: <the payload you recorded>
+  You are the Lab Runner. You own one action: executing this round's recorded experiment.
+  Read lab__research_record(kinds=["experiment_spec"], round=<round>, last_n=1, full=True).
+  Call lab__measure exactly once with that spec: candidate_ids=<its candidate_ids, unchanged>,
+  requested_by="lab_runner", rationale=<its rationale plus why the other designs lost>,
+  hypothesis_id=<its hypothesis_id>, design=<its chosen_design>. An Omnigent policy may hold
+  the call for human approval; if it is denied or refused, report that verbatim and stop.
+  Final reply: the JSON that lab__measure returned (or the refusal).
   Rules for every answer:
   - Call tools exactly by their prefixed names (lab__<tool>, literature__<tool>); never
     invent a tool name and never put data where a tool name goes.
-  - Record your decision with lab__record_decision BEFORE you reply. If the lab returns an
-    error, fix the payload and record again.
-  - Your final reply is ONLY the JSON object described above (the same payload you
-    recorded), with no prose and no code fences.
+  - Your only tools are lab__lab_status, lab__research_record and lab__measure. You record
+    nothing yourself: lab__measure writes the result to the research record.
+  - Your final reply is ONLY the JSON that lab__measure returned (or the refusal), with no
+    prose and no code fences.

@@ -22,8 +22,8 @@ so each rehearsal starts a fresh lab.
 
 Models (override in .env): Mistral is the lab's engine; the Critic is Claude through
 OpenRouter, a different family from the Mistral Hypothesis Generator.
-  PI, Hypothesis Generator, Experiment Planner   MISTRAL_LARGE_MODEL  (mistral-large-latest)
-  Screening, Safety Officer, Literature Scouts   MISTRAL_SMALL_MODEL  (mistral-small-latest)
+  PI, Hypothesis Generator, Screening, Planner   MISTRAL_LARGE_MODEL  (mistral-large-latest)
+  Safety Officer, Literature Scouts              MISTRAL_SMALL_MODEL  (mistral-small-latest)
   Critic                                         CRITIC_MODEL         (anthropic/claude-sonnet-5.5)
   PI_ENGINE=claude moves only the PI to Claude Sonnet on OpenRouter (fallback if a
   Mistral PI does not coordinate well).
@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import sys
 import time
@@ -80,9 +81,12 @@ VARIANTS = {
 }
 
 
-def providers_for(variant: str) -> dict[str, str]:
+def providers_for(variant: str, mistral_side: str | None = None) -> dict[str, str]:
+    """mistral_side overrides only the Mistral key (e.g. run some overnight campaigns on the
+    demo Mistral key for parallelism); OpenRouter always follows the variant, so campaigns
+    never spend the demo OpenRouter budget."""
     side = VARIANTS[variant]["keys"]
-    mistral, openrouter = f"mistral_{side}", f"openrouter_{side}"
+    mistral, openrouter = f"mistral_{mistral_side or side}", f"openrouter_{side}"
     pi_on_claude = PI_ENGINE == "claude"
     return {
         "__MISTRAL_PROVIDER__": mistral,
@@ -94,8 +98,8 @@ def providers_for(variant: str) -> dict[str, str]:
     }
 
 
-def missing_keys(variant: str) -> list[str]:
-    p = providers_for(variant)
+def missing_keys(variant: str, mistral_side: str | None = None) -> list[str]:
+    p = providers_for(variant, mistral_side)
     needed = {p["__MISTRAL_PROVIDER__"], p["__CRITIC_PROVIDER__"], p["__PI_PROVIDER__"]}
     return sorted(PROVIDER_KEYS[name] for name in needed if not os.getenv(PROVIDER_KEYS[name]))
 
@@ -108,13 +112,14 @@ def run_id_for(variant: str, task: str, seed: int) -> str:
     return f"{strategy}-{task}-s{seed}"
 
 
-def render(variant: str, task: str, seed: int, budget: int, usd_cap: float, run_id: str | None = None) -> Path:
+def render(variant: str, task: str, seed: int, budget: int, usd_cap: float,
+           mistral_side: str | None = None, run_id: str | None = None, stage_usd_cap: float = 0.30) -> Path:
     if "mistral" in CRITIC_MODEL.lower():
         sys.exit("CRITIC_MODEL must be a different model family from the Mistral Hypothesis Generator")
     cfg = VARIANTS[variant]
     run_id = run_id or run_id_for(variant, task, seed)  # --run-id rebuilds an existing campaign's bundle
     subs = {
-        **providers_for(variant),
+        **providers_for(variant, mistral_side),
         "__MISTRAL_LARGE__": MISTRAL_LARGE,
         "__MISTRAL_SMALL__": MISTRAL_SMALL,
         "__CRITIC_MODEL__": CRITIC_MODEL,
@@ -127,6 +132,7 @@ def render(variant: str, task: str, seed: int, budget: int, usd_cap: float, run_
         "__BUDGET__": str(budget),
         "__PYTHON__": str(ROOT / ".venv" / "bin" / "python"),
         "__USD_CAP__": f"{usd_cap:.2f}",
+        "__STAGE_USD_CAP__": f"{stage_usd_cap:.2f}",
         "__APPROVAL_TIMEOUT__": str(cfg.get("approval_timeout_s", 900)),
     }
     dest = OUT / run_id
@@ -140,7 +146,8 @@ def render(variant: str, task: str, seed: int, budget: int, usd_cap: float, run_
             continue
         for k, v in subs.items():
             text = text.replace(k, v)
-        leftover = [l for l in text.splitlines() if "__" in l and not l.lstrip().startswith("#")]
+        leftover = [l for l in text.splitlines()
+                    if re.search(r"__[A-Z][A-Z_]*__", l) and not l.lstrip().startswith("#")]
         if leftover:
             sys.exit(f"unrendered placeholders in {src}: {leftover[:3]}")
         text = text.replace("# TEMPLATE: render with `python agents/build.py`; do not run directly.",
@@ -165,18 +172,23 @@ def main() -> None:
     ap.add_argument("--usd-cap", type=float, default=1.5,
                     help="hard LLM spend cap per round session (USD), enforced by Omnigent")
     ap.add_argument("--run-id", help="rebuild the bundle of an existing campaign under this run id")
+    ap.add_argument("--stage-usd-cap", type=float, default=0.30,
+                    help="hard LLM spend cap per single-agent stage session (USD), enforced by Omnigent")
+    ap.add_argument("--mistral-keys", choices=["demo", "campaigns"], default=None,
+                    help="override which Mistral key the agents use (OpenRouter is unchanged)")
     args = ap.parse_args()
     if args.variant == "smoke":
         args.budget = min(args.budget, 10)
     for v in list(VARIANTS) if args.variant == "all" else [args.variant]:
-        missing = missing_keys(v)
+        missing = missing_keys(v, args.mistral_keys)
         if missing:
             msg = f"{v}: set {', '.join(missing)} in .env first"
             if args.variant == "all":
                 print(f"skipped {msg}", file=sys.stderr)
                 continue
             sys.exit(msg)
-        print(render(v, args.task, args.seed, args.budget, args.usd_cap, args.run_id))
+        print(render(v, args.task, args.seed, args.budget, args.usd_cap,
+                     mistral_side=args.mistral_keys, run_id=args.run_id, stage_usd_cap=args.stage_usd_cap))
 
 
 if __name__ == "__main__":

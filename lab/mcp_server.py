@@ -20,11 +20,13 @@ import functools
 import json
 import os
 import threading
+import time
 
 import numpy as np
 from mcp.server.mcpserver import MCPServer
 
 from lab import sync
+from lab.baselines import EXPERT_TIERS, expert_tier
 from lab.features import anonymized_descriptor_view
 from lab.oracle import BudgetExceeded, Oracle
 from lab.surrogate import Surrogate
@@ -214,13 +216,20 @@ def evaluate_designs(designs: list[dict]) -> list[dict]:
     for d in designs:
         cids = [c for c in d.get("candidate_ids", []) if c in pub.index and c not in lab.measured]
         cost = len(cids) * lab.cost_per_measurement
-        row = {"name": d.get("name"), "n": len(cids), "cost": cost,
-               "families": int(pub.loc[cids, "family"].nunique()) if cids else 0}
+        row = {"name": d.get("name"), "n": len(cids), "cost": cost}
+        if not ANON:
+            row["families"] = int(pub.loc[cids, "family"].nunique()) if cids else 0
         if sur is not None and cids:
             sc = sur.score(cids, lab.threshold)
             row.update(expected_hits=round(float(sc.p_hit.sum()), 2),
                        expected_learning=round(float(sc.sd.mean()), 3),
                        learning_per_cost=round(float(sc.sd.sum()) / max(cost, 1e-9), 3))
+        elif cids and not ANON:
+            # Before the surrogate exists: a public prior, the textbook family ranking the
+            # expert baseline uses (sulfides > halides > ... ; never fitted to OBELiX).
+            tiers = [expert_tier(f) for f in pub.loc[cids, "family"]]
+            row["prior_score"] = round(float(sum(1 - t / (len(EXPERT_TIERS) + 1) for t in tiers) / len(tiers)), 3)
+            row["note"] = "surrogate not ready (<5 measurements): prior_score is the textbook family prior"
         else:
             row["note"] = "surrogate not ready (<5 measurements); judge on prior evidence"
         out.append(row)
@@ -241,9 +250,12 @@ def measure(candidate_ids: list[str], requested_by: str, rationale: str,
         return {"error": f"max {MAX_BATCH} candidates per round"}
     if design is not None and design not in DESIGNS:
         return {"error": f"design must be one of {DESIGNS}"}
+    lab = _lab()
+    if not _spec_recorded(lab, candidate_ids):
+        return {"error": "no experiment_spec for this batch in the record for this round: the planner's "
+                         "spec (same candidate_ids) must be recorded before measuring"}
     _activity("working", f"Running {len(candidate_ids)} lab measurements ({design or 'design n/a'})", "measure",
               {"candidates": candidate_ids, "design": design}, after_measure=False)
-    lab = _lab()
     try:
         res = lab.measure(candidate_ids, requested_by=requested_by, rationale=rationale,
                           hypothesis_id=hypothesis_id, design=design)
@@ -263,6 +275,37 @@ def measure(candidate_ids: list[str], requested_by: str, rationale: str,
 
 
 @mcp.tool()
+def wait_for_specialists(kind: str | None = None, author: str | None = None, min_authors: int = 1,
+                         seconds: int = 45) -> dict:
+    """Wait, spending no tokens, until dispatched specialists have recorded their output.
+
+    kind: the decision you are waiting for (evidence, hypothesis, candidate_set,
+    experiment_spec, review); author: optionally whose (e.g. "critic", "safety");
+    min_authors: how many distinct authors (3 for the three literature scouts).
+    Returns as soon as it is recorded for the upcoming round, or after `seconds` (max 45).
+    Then call sys_read_inbox. Without `kind`, simply waits `seconds`.
+    Keeps the PI's turn alive: ending the turn can close a headless session early.
+    """
+    n = max(5, min(int(seconds), 45))
+    _activity("waiting", f"Waiting for {author or 'the specialists'}" + (f" ({kind})" if kind else ""),
+              "wait_for_specialists")
+    deadline = time.time() + n
+    while True:
+        if kind:
+            lab = _lab()
+            target = lab.round if kind == "review" and author == "critic" else lab.round + 1
+            authors = {e.get("author") for e in lab.events((kind,)) if e.get("round") == target
+                       and (author is None or e.get("author") == author)}
+            if len(authors) >= max(1, min_authors):
+                return {"recorded": True, "kind": kind, "authors": sorted(a for a in authors if a),
+                        "next": "call sys_read_inbox"}
+        if time.time() >= deadline:
+            return {"recorded": False, "waited_seconds": n,
+                    "next": "call sys_read_inbox; if the specialist finished without recording, record its JSON yourself"}
+        time.sleep(2)
+
+
+@mcp.tool()
 def record_decision(kind: str, author: str, payload: dict) -> dict:
     """Append a structured decision to the shared research record.
 
@@ -275,9 +318,14 @@ def record_decision(kind: str, author: str, payload: dict) -> dict:
     if not isinstance(payload, dict) or not payload:
         return {"error": "payload must be a non-empty object; record nothing if there is nothing to record"}
     lab = _lab()
+    problem = _validate_decision(lab, kind, author, payload)
+    if problem:
+        return {"error": problem}
     lab.log_event(kind, author=author, payload=payload)
+    # same round numbering as Oracle.log_event: only the critic's review and the final
+    # next_step belong to the round just measured (the safety review precedes measuring)
     _activity("done", _recorded(kind, payload), "record_decision", {"kind": kind},
-              after_measure=kind in ("review", "next_step"))
+              after_measure=kind == "next_step" or (kind == "review" and author == "critic"))
     return {"ok": True, "run_id": lab.run_id}
 
 
@@ -289,6 +337,46 @@ def _recorded(kind: str, payload: dict) -> str:
              "candidate_set": "Shortlisted candidates", "experiment_spec": f"Chose the {payload.get('design') or payload.get('chosen') or ''} design",
              "review": f"Review: {payload.get('verdict') or 'recorded'}", "next_step": "Next step"}.get(kind, kind)
     return f"{label}: {str(text)[:160]}" if text else label
+
+
+def _validate_decision(lab: Oracle, kind: str, author: str, payload: dict) -> str | None:
+    """Reject decisions the lab cannot act on, so mistakes surface where they are made."""
+    valid = set(lab.candidate_ids)
+    if kind == "candidate_set":
+        ids = [c.get("candidate_id") for c in payload.get("candidates") or [] if isinstance(c, dict)]
+        bad = [i for i in ids if i not in valid]
+        if not ids or bad:
+            return (f"unknown candidate ids {bad[:8]}: use only ids returned by list_candidates or "
+                    f"surrogate_rank (OBELiX ids such as 'jqc'), never invented or formula-based ids")
+    if kind == "experiment_spec":
+        ids = list(payload.get("candidate_ids") or [])
+        for d in payload.get("designs") or []:
+            if isinstance(d, dict):
+                ids += list(d.get("candidate_ids") or [])
+        bad = sorted({i for i in ids if i not in valid})
+        if not payload.get("candidate_ids") or bad:
+            return (f"unknown candidate ids {bad[:8]}: build designs only from the recorded candidate "
+                    f"sets (research_record kinds=['candidate_set'])")
+        already = [i for i in payload["candidate_ids"] if i in lab.measured]
+        if already:
+            return f"already measured: {already}; choose unmeasured candidates"
+    if kind == "next_step":
+        if lab.remaining >= lab.cost_per_measurement:
+            return ("next_step is only for the end of the campaign (budget not spent yet); "
+                    "finish the round with your 3-line summary instead")
+        if lab.round and not _critic_reviewed(lab, lab.round):
+            return f"round {lab.round} has no critic review yet: dispatch the critic and wait for it first"
+    return None
+
+
+def _spec_recorded(lab: Oracle, candidate_ids: list[str]) -> bool:
+    want = set(candidate_ids)
+    return any(e.get("round") == lab.round + 1 and set((e.get("payload") or {}).get("candidate_ids") or []) == want
+               for e in lab.events(("experiment_spec",)))
+
+
+def _critic_reviewed(lab: Oracle, round_: int) -> bool:
+    return any(e.get("round") == round_ and e.get("author") == "critic" for e in lab.events(("review",)))
 
 
 @mcp.tool()
