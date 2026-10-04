@@ -335,11 +335,24 @@ def record_decision(kind: str, author: str, payload: dict) -> dict:
 
 def _recorded(kind: str, payload: dict) -> str:
     """One readable line for the live map, e.g. 'Proposed H2: Lu substitution ...'."""
+    if kind == "review":
+        reopened = [v.get("hypothesis_id") for v in payload.get("verdicts") or [] if v.get("reopen")]
+        if reopened:  # the Critic changing the lab's course: the moment judges should see
+            label = f"Reopened {', '.join(h for h in reopened if h)}"
+        elif payload.get("verdicts"):
+            label = "Reviewed the round: " + ", ".join(
+                f"{v.get('hypothesis_id')} {v.get('verdict')}" for v in payload["verdicts"][:3] if v.get("hypothesis_id"))
+        elif payload.get("decision"):  # Safety officer
+            label = f"Safety check: {payload['decision']}"
+        else:
+            label = "Reviewed the round"
+        text = payload.get("plan_change") or payload.get("notes") or payload.get("summary") or ""
+        return f"{label}. {str(text)[:160]}" if text else label
     text = (payload.get("statement") or payload.get("trend") or payload.get("summary") or payload.get("plan_change")
             or payload.get("rationale") or payload.get("next_experiment") or "")
     label = {"evidence": "Added evidence", "hypothesis": f"Proposed {payload.get('id', 'a hypothesis')}",
              "candidate_set": "Shortlisted candidates", "experiment_spec": f"Chose the {payload.get('design') or payload.get('chosen') or ''} design",
-             "review": f"Review: {payload.get('verdict') or 'recorded'}", "next_step": "Next step",
+             "next_step": "Next step",
              "direction": f"Next round: {payload.get('mode', '')} on {', '.join(payload.get('focus_families') or [])}"}.get(kind, kind)
     return f"{label}: {str(text)[:160]}" if text else label
 

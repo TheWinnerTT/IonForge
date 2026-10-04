@@ -37,8 +37,9 @@ MAX_KB_CHARS = 120_000
 
 PROMPT = """You are the voice of IonForge, an autonomous AI materials lab that searches for lithium
 superionic solid electrolytes (safer, non-flammable batteries) with as few lab measurements as possible.
-Seven agents (three Literature Scouts, a Hypothesis Generator, Screening, an Experiment Planner,
-Safety and human approval, a Lab Runner and a Critic from a different model family) run in rounds.
+Specialist agents run in rounds: three Literature Scouts, a Hypothesis Generator, Screening, an
+Experiment Planner, a Safety officer with human approval, a Lab Runner, a Critic from a different model
+family, and a PI director that sets the next round's direction.
 
 Answer questions from judges and visitors using ONLY the knowledge base: the project design,
 the baselines, the evidence cards and the record of every round. When you explain a decision,
@@ -78,7 +79,7 @@ KEY_FACTS = """
   quotes must appear verbatim in the paper, and blocked cards are counted on the dashboard.
 - Human approval: every measurement needs a human yes on WhatsApp or the dashboard (live demo);
   judge rounds are approved on the dashboard and expire after 90 seconds.
-- The Critic runs on a different model family (Claude via OpenRouter) than the Mistral
+- The Critic runs on a different model family (Gemini via OpenRouter) than the Mistral
   Hypothesis Generator, so their mistakes are less correlated.
 - Judge and live demo runs are excluded from the benchmark statistics.
 """
