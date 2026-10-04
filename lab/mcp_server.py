@@ -142,8 +142,10 @@ def family_overview() -> list[dict]:
 @mcp.tool()
 @_tracked
 def list_candidates(family: str | None = None, contains_element: str | None = None,
-                    unmeasured_only: bool = True, limit: int = 40) -> list[dict]:
-    """Browse candidates (never their conductivity). Filter by family or by an element symbol."""
+                    unmeasured_only: bool = True, limit: int = 40, offset: int = 0) -> list[dict]:
+    """Browse candidates (never their conductivity). Filter by family or by an element symbol;
+    page with offset. In the anonymized lab the filters are unavailable: page with offset
+    (at most 25 rows per call) or use surrogate_rank."""
     lab = _lab()
     pub = lab.public_table()
     ids = lab.unmeasured if unmeasured_only else list(pub.index)
@@ -152,7 +154,9 @@ def list_candidates(family: str | None = None, contains_element: str | None = No
     if contains_element and not ANON:
         el = contains_element.strip()
         ids = [c for c in ids if _has_element(pub.at[c, "composition"], el)]
-    return _public_rows(lab, ids[: max(1, min(limit, 200))])
+    cap = 25 if ANON else 200  # anonymized rows are all numbers: keep each result small
+    start = max(0, offset)
+    return _public_rows(lab, ids[start: start + max(1, min(limit, cap))])
 
 
 @mcp.tool()
@@ -328,7 +332,11 @@ def record_decision(kind: str, author: str, payload: dict) -> dict:
     lab.log_event(kind, author=author, payload=payload)
     # same round numbering as Oracle.log_event: only the critic's review and the final
     # next_step belong to the round just measured (the safety review precedes measuring)
-    _activity("done", _recorded(kind, payload), "record_decision", {"kind": kind},
+    try:
+        label = _recorded(kind, payload)
+    except Exception:  # a label must never fail a decision that is already recorded
+        label = kind
+    _activity("done", label, "record_decision", {"kind": kind},
               after_measure=kind == "next_step" or (kind == "review" and author == "critic"))
     return {"ok": True, "run_id": lab.run_id}
 
@@ -378,6 +386,10 @@ def _validate_decision(lab: Oracle, kind: str, author: str, payload: dict) -> st
         already = [i for i in payload["candidate_ids"] if i in lab.measured]
         if already:
             return f"already measured: {already}; choose unmeasured candidates"
+        affordable = int(lab.remaining // lab.cost_per_measurement)
+        if len(payload["candidate_ids"]) > min(affordable, MAX_BATCH):
+            return (f"the batch has {len(payload['candidate_ids'])} candidates but only {affordable} "
+                    f"measurement(s) remain in the budget: choose at most {min(affordable, MAX_BATCH)}")
         return _check_hits(lab, payload)
     if kind == "direction":
         if payload.get("mode") not in ("explore", "exploit", "test"):

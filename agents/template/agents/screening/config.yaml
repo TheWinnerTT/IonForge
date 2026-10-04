@@ -61,7 +61,7 @@ prompt: |
   with lab__record_decision(kind="candidate_set", author="screening",
   payload={"hypothesis_id": str, "candidates": [{"candidate_id": str, "why": <= 12 words,
   "mu": num|null, "sd": num|null, "p_hit": num|null}]}), 5-8 candidates, best first,
-  preferring different near_duplicate_groups.
+  preferring different near_duplicate_groups.__ANON_SCREENING_RULES__
   Final reply: {"candidate_sets": [<the payloads you recorded>]}
   Rules for every answer:
   - Call tools exactly by their prefixed names (lab__<tool>, literature__<tool>); never

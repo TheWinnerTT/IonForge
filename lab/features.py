@@ -170,9 +170,12 @@ def anonymized_descriptor_view(ids: list[str]) -> list[dict]:
     keep = ["li_frac", "is_sulfide", "is_halide", "is_oxide", "vol_per_atom", "li_density",
             "n_elements", "space_group", "mm_MagpieData mean Electronegativity",
             "mm_MagpieData mean CovalentRadius", "mm_frac p valence electrons"]
+    short = {"mm_MagpieData mean Electronegativity": "mean_en", "mm_MagpieData mean CovalentRadius": "mean_cov_radius",
+             "mm_frac p valence electrons": "frac_p_valence"}
     ft = feature_table()
     ft = ft.loc[ids, [c for c in keep if c in ft.columns]].round(3)
-    ft.columns = [c.replace("mm_MagpieData ", "").replace("mm_", "") for c in ft.columns]
+    # short keys without spaces: long, spaced keys in big tool results confuse tool calling
+    ft.columns = [short.get(c, c) for c in ft.columns]
     return [{"candidate_id": i, **row} for i, row in ft.to_dict("index").items()]
 
 

@@ -50,8 +50,19 @@ if not os.environ.get("SSL_CERT_FILE"):
     os.environ["SSL_CERT_FILE"] = certifi.where()
 
 OMNI = os.environ.get("IONFORGE_OMNI") or os.path.expanduser("~/.local/bin/omnigent")  # override: offline tests
+
+# Omnigent's local host daemon inherits only an allow-list of standard key names
+# (MISTRAL_API_KEY, OPENROUTER_API_KEY, ...) plus anything prefixed OMNIGENT_, and
+# resolves `env:VAR` provider refs from VAR or OMNIGENT_VAR. Our custom key names
+# (campaign / backup keys) would be dropped, so export the OMNIGENT_ alias of each.
+# The daemon is reused once started: it must first be spawned from this environment.
+CUSTOM_KEYS = ("MISTRAL_API_KEY_CAMPAIGNS", "MISTRAL_API_KEY_BACKUP",
+               "OPENROUTER_API_KEY_CAMPAIGNS", "OPENROUTER_API_KEY_BACKUP")
+for _k in CUSTOM_KEYS:
+    if os.environ.get(_k):
+        os.environ[f"OMNIGENT_{_k}"] = os.environ[_k]
 STAGE_TIMEOUT_S = 8 * 60
-ATTEMPTS = 3
+ATTEMPTS = 4  # Mistral sometimes ends a turn without recording or with a malformed tool call
 MAX_FAILED_ROUNDS = 2
 FAMILIES = ("sulfides", "oxides", "halides")
 
@@ -233,31 +244,47 @@ def _failure_reason(out: str, rc) -> str:
 
 
 def run_scouts(ctx: dict, rnd: int) -> dict:
-    """Three literature scouts in parallel; best effort (a family may have no usable cards)."""
-    t0, procs = time.time(), []
-    for fam in FAMILIES:
-        stage = Stage("literature_scout", "evidence", f"literature_scout_{fam}", "evidence",
-                      f"Your family is {fam}. Round {rnd}.")
-        log = ctx["logs"] / f"round-{rnd:02d}-scout-{fam}.log"
-        fh = log.open("w")
-        procs.append((fam, stage, log, fh, subprocess.Popen(
-            [OMNI, "run", str(ctx["bundle"] / "agents" / "literature_scout"), "-p", stage.task],
-            stdout=fh, stderr=subprocess.STDOUT, cwd=ROOT, env=os.environ.copy())))
-        time.sleep(4)  # stagger session start-up on the local Omnigent server
-    result = {}
-    for fam, stage, log, fh, p in procs:
-        try:
-            p.wait(timeout=STAGE_TIMEOUT_S)
-        except subprocess.TimeoutExpired:
-            p.kill()
-        fh.close()
-        lab = open_lab(*ctx["lab_args"])
-        n = len(events(lab, "evidence", rnd, f"literature_scout_{fam}"))
-        if n == 0 and p.returncode == 0:
-            record_from_reply(lab, stage, log.read_text(errors="replace"))  # recorded nothing itself
-            n = len(events(open_lab(*ctx["lab_args"]), "evidence", rnd, f"literature_scout_{fam}"))
-        result[fam] = n
-    return {"ok": True, "cards": result, "seconds": round(time.time() - t0)}
+    """Three literature scouts in parallel. A scout whose session fails (or records nothing)
+    is retried; a family may legitimately end with no usable cards, but a campaign with
+    literature never proceeds with zero evidence (that would silently be the no-literature
+    ablation)."""
+    t0, result, attempts = time.time(), {}, {}
+    pending = list(FAMILIES)
+    for attempt in range(1, ATTEMPTS + 1):
+        procs = []
+        for fam in pending:
+            stage = Stage("literature_scout", "evidence", f"literature_scout_{fam}", "evidence",
+                          f"Your family is {fam}. Round {rnd}.")
+            log = ctx["logs"] / f"round-{rnd:02d}-scout-{fam}-{attempt}.log"
+            fh = log.open("w")
+            procs.append((fam, stage, log, fh, subprocess.Popen(
+                [OMNI, "run", str(ctx["bundle"] / "agents" / "literature_scout"), "-p", stage.task],
+                stdout=fh, stderr=subprocess.STDOUT, cwd=ROOT, env=os.environ.copy())))
+            time.sleep(4)  # stagger session start-up on the local Omnigent server
+        failed = []
+        for fam, stage, log, fh, p in procs:
+            try:
+                p.wait(timeout=STAGE_TIMEOUT_S)
+            except subprocess.TimeoutExpired:
+                p.kill()
+            fh.close()
+            attempts[fam] = attempt
+            lab = open_lab(*ctx["lab_args"])
+            n = len(events(lab, "evidence", rnd, f"literature_scout_{fam}"))
+            if n == 0 and p.returncode == 0:
+                record_from_reply(lab, stage, log.read_text(errors="replace"))  # recorded nothing itself
+                n = len(events(open_lab(*ctx["lab_args"]), "evidence", rnd, f"literature_scout_{fam}"))
+            result[fam] = n
+            if n == 0 and p.returncode != 0:
+                failed.append(fam)
+        pending = failed
+        if not pending:
+            break
+    ok = sum(result.values()) > 0
+    out = {"ok": ok, "cards": result, "attempts": attempts, "seconds": round(time.time() - t0)}
+    if not ok:
+        out["reason"] = "no evidence cards from any scout (see the scout logs)"
+    return out
 
 
 def _already_done(ctx: dict, stage: Stage, rnd: int) -> bool:
@@ -273,8 +300,24 @@ def run_round(ctx: dict) -> dict:
     lab = open_lab(*ctx["lab_args"])
     rnd, remaining = lab.round + 1, lab.remaining
     report = {"round": rnd, "stages": {}}
+    if lab.round and not events(lab, "review", lab.round, "critic"):
+        # resumed after an interruption between the measurement and the Critic
+        report["stages"]["critic"] = run_stage(ctx, round_stages(lab.round, remaining)[-1], lab.round)
+        if not report["stages"]["critic"]["ok"]:
+            report["failed_at"] = "critic"
+            return report
+    if lab.round and remaining >= 1 and not events(lab, "direction", rnd):
+        # resumed after an interruption between the Critic and the PI director: the round
+        # just measured still needs its direction before the next round may start
+        report["stages"]["pi_director"] = run_stage(ctx, director_stage(lab.round), lab.round)
+        if not report["stages"]["pi_director"]["ok"]:
+            report["failed_at"] = "pi_director"
+            return report
     if ctx["literature"] and not lab.events(("evidence",)):
         report["stages"]["scouts"] = run_scouts(ctx, rnd)
+        if not report["stages"]["scouts"]["ok"]:
+            report["failed_at"] = "scouts"
+            return report
     for stage in round_stages(rnd, remaining):
         if _already_done(ctx, stage, rnd):  # resume an interrupted round: never redo (or re-pay) a stage
             report["stages"][stage.agent] = {"ok": True, "skipped": "already in the record"}
@@ -322,7 +365,10 @@ def main() -> None:
     logs.mkdir(parents=True, exist_ok=True)
     ctx = {"bundle": bundle, "logs": logs, "lab_args": (args.task, args.budget, args.seed, run_id, strategy),
            "literature": (bundle / "agents" / "literature_scout" / "tools" / "mcp" / "literature.yaml").exists()}
-    max_rounds = args.max_rounds or (args.budget // 5)
+    # Rounds run until the budget is spent and the campaign is closed; the cap only guards
+    # against a runaway loop. It leaves room for a short final batch (a round that measured
+    # fewer than 5) and for retried rounds, which also pass through this loop.
+    max_rounds = args.max_rounds or (args.budget // 5 + 4)
 
     print(f"campaign {run_id}: variant={args.variant} budget={args.budget} max_rounds={max_rounds}", flush=True)
     if args.dry_run:

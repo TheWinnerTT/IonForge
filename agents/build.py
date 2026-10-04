@@ -58,6 +58,12 @@ CRITIC_MODEL = os.getenv("CRITIC_MODEL", "google/gemini-3.8-flash")
 PI_ENGINE = os.getenv("PI_ENGINE", "mistral")
 CLAUDE_PI_MODEL = os.getenv("CLAUDE_PI_MODEL", "anthropic/claude-sonnet-5.5")
 
+ANON_SCREENING_RULES = """
+  In this lab, formulas and families are hidden: there are no family or element filters.
+  Call ONE tool at a time, never several in parallel. Call lab__surrogate_rank(top=30)
+  at most once (after >= 5 measurements) and lab__list_candidates at most twice (page with
+  offset); pick each hypothesis's candidates from those results by their descriptors."""
+
 # provider name -> environment variable holding its key
 PROVIDER_KEYS = {
     "mistral_demo": "MISTRAL_API_KEY",
@@ -134,6 +140,10 @@ def render(variant: str, task: str, seed: int, budget: int, usd_cap: float,
         "__USD_CAP__": f"{usd_cap:.2f}",
         "__STAGE_USD_CAP__": f"{stage_usd_cap:.2f}",
         "__APPROVAL_TIMEOUT__": str(cfg.get("approval_timeout_s", 900)),
+        # Anonymized lab only (formulas and families hidden): Mistral mixed up the results of
+        # many parallel, all-numeric tool calls there. Every other variant renders "" here,
+        # so their prompts are unchanged.
+        "__ANON_SCREENING_RULES__": ANON_SCREENING_RULES if cfg["anon"] == "1" else "",
     }
     dest = OUT / run_id
     if dest.exists():

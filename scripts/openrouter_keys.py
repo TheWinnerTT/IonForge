@@ -5,7 +5,7 @@ the Makefile evals this script to point those vars at a key that is valid and st
 has credits:
 
   OPENROUTER_API_KEY            <- first healthy of OPENROUTER_API_KEY, OPENROUTER_API_KEY_BACKUP
-  OPENROUTER_API_KEY_CAMPAIGNS  <- first healthy of OPENROUTER_API_KEY_CAMPAIGNS, OPENROUTER_API_KEY_BACKUP, OPENROUTER_API_KEY
+  OPENROUTER_API_KEY_CAMPAIGNS  <- first healthy of OPENROUTER_API_KEY_CAMPAIGNS, OPENROUTER_API_KEY_BACKUP
 
     python scripts/openrouter_keys.py            # status table (no keys printed)
     eval "$(python scripts/openrouter_keys.py --export)"
@@ -22,7 +22,8 @@ load_dotenv()
 MIN_CREDITS = 0.25  # USD; below this a key is treated as exhausted
 ROLES = {
     "OPENROUTER_API_KEY": ("OPENROUTER_API_KEY", "OPENROUTER_API_KEY_BACKUP"),
-    "OPENROUTER_API_KEY_CAMPAIGNS": ("OPENROUTER_API_KEY_CAMPAIGNS", "OPENROUTER_API_KEY_BACKUP", "OPENROUTER_API_KEY"),
+    # Campaigns run only on the friend's keys: never fall back to the demo key (its owner's credits).
+    "OPENROUTER_API_KEY_CAMPAIGNS": ("OPENROUTER_API_KEY_CAMPAIGNS", "OPENROUTER_API_KEY_BACKUP"),
 }
 
 

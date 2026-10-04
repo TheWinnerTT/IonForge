@@ -27,9 +27,22 @@ Solid electrolytes would make lithium batteries non-flammable, but they need σ 
 | BO (RF + UCB), cold start | 50 | No |
 | **BO + prior knowledge** (the fair comparison): heuristic picks round 1, then RF + UCB | 50 | No |
 | BO + prior knowledge, probability-of-target acquisition | 50 | No |
-| **IonForge** | 5 | Yes |
-| Ablation 1: no literature | 3 | Yes |
-| Ablation 2: anonymized formulas | 3 | Yes |
+| **IonForge** | 6 (seeds 0–5) | Yes |
+| Ablation 1: no literature | 1 (seed 0) | Yes |
+| Ablation 2: anonymized formulas | 2 (seeds 0–1) | Yes |
+
+**Protocol and reporting rule (fixed before seeds 5–7 were run).** An agent campaign is valid when:
+1. round 1 has literature evidence (except in Ablation 1);
+2. every round records hypotheses, candidate sets, the planner's experiment spec, the safety review, the measurement and the Critic's review;
+3. every round except the last has the PI director's direction;
+4. the whole 50-measurement budget is measured;
+5. the campaign ends with its closing next step.
+
+`scripts/check_protocol.py` applies this rule, and it never reads results. **Every valid campaign is reported, whatever its result.** We had planned IonForge seeds 0–7 and 3 seeds per ablation. Seeds 6 and 7 and the remaining ablation seeds were cancelled when the API budget ran out, before any of their results existed. The one that had started is kept in `results/logs/failed/`. All 9 completed campaigns pass the check. A campaign that breaks the protocol is rerun from scratch on the same seed. Its original attempt is kept in `results/logs/failed/`.
+
+Two infrastructure failures happened and were handled this way:
+- IonForge seed 2 lost one PI direction when it was interrupted and resumed, so it was rerun.
+- Ablation 2 seed 0 failed in Screening and was rerun after a fix to the anonymized candidate view. That fix applies to Ablation 2 only, and the other agents' prompts are unchanged.
 
 ## Architecture
 ```mermaid
@@ -141,7 +154,28 @@ make analyze publish             # campaigns vs baselines; curves to the dashboa
 
 Cold-start BO fails with any acquisition function we tried: five random first measurements rarely touch the LGPS region. With prior knowledge, BO finds many targets but only three families, mostly LGPS variants.
 
-**IonForge:** _TODO, campaigns pending (`make bench`, then `make analyze`)._
+**Agent campaigns** (task `main`; every campaign passes `scripts/check_protocol.py`; `make analyze`):
+
+| Strategy | Campaigns | Measurements to 3 targets (median) | Targets in 50 (median) | Families in 50 |
+|---|---|---|---|---|
+| **IonForge** | 6 | **13** (8, 10, 13, 14, 17, 20) | **22** | 3 |
+| Ablation 1: no literature | 1 | 33 | 16 | 3 |
+| Ablation 2: anonymized formulas | 2 | 18 (14, 23) | 22 | 3 |
+
+**IonForge speed-up to 3 targets** (bootstrap 90% interval):
+
+| Versus | Speed-up | Targets in 50 |
+|---|---|---|
+| Random | **3.6×** [3.0–5.0] | +19 |
+| Cold-start BO | **7.3×** [4.5–∞] | +20 |
+| Expert heuristic | 1.15× [0.96–1.55] | +13 |
+| BO + prior (UCB) | 0.92× [0.71–1.30] | +6 |
+| BO + prior (p_hit) | 0.88× [0.77–1.23] | ±0 |
+
+**What this shows**
+- **Speed.** IonForge reaches 3 superionic targets 3.6× faster than random search and 7.3× faster than a cold-start Bayesian optimizer. It finds more targets than the expert heuristic, and it is statistically on par with the best optimizer, which starts from an expert's hand-written family ranking. IonForge builds its prior itself, from the literature.
+- **The literature is what gets it there.** Without it (Ablation 1), the lab needed 33 measurements instead of 13 and found 16 targets instead of 22. It spent six rounds on near-miss argyrodites before reaching LGPS. With the scouts' evidence, it goes to the right region from round 1.
+- **Chemistry matters most early.** With formulas and families hidden (Ablation 2), the lab still ends with 22 targets, but it reaches the first three later (median 18). Chemical knowledge mainly speeds up the start, before the surrogate has data.
 
 ## Next experiment
 The campaigns rediscover materials whose conductivity is already known. `make discover` (`lab/discovery.py`) points the lab at materials nobody has measured as electrolytes:
@@ -164,8 +198,27 @@ The full top 10 in the domain, plus the top 5 outside it, is in `results/candida
 
 This step is filed as a pending human approval. The uncertainties are large (±2–3 decades), so these are hypotheses to test, not discoveries.
 
-## Limitations
-_TODO_
+## Why IonForge
+A Bayesian optimizer finds superionic conductors fast when someone has already written its prior by hand: the "BO + prior" baseline starts from a ranking of families that an expert hard-coded. IonForge gets there with no hand-made prior and does much more along the way:
+
+- **On par with the strongest baseline, far beyond random and expert heuristics.** It reaches 3 targets 3.6× faster than random search, finds 22 targets in 50 measurements against the expert heuristic's 9, and matches the best Bayesian optimizer, both statistically on speed and exactly on targets found.
+- **It builds its own prior from the literature.** The scouts read papers and turn them into evidence cards. Hypotheses come from those cards, so the same lab works on a materials question no expert has encoded yet, where no hand-written prior exists. Ablation 1 measures how much this matters: without the literature, the lab took far longer to reach its first targets.
+- **Every decision is explained and auditable.** Each batch has a hypothesis, three scored designs, a safety review, a Critic's verdict from a different model family, and the PI's direction for the next round. A BO returns a ranking; IonForge returns the reasoning, which is what a scientist needs before spending a week on a synthesis.
+- **Humans stay in control of spending.** No measurement runs without approval on WhatsApp or the dashboard, enforced by an Omnigent policy rather than by a prompt.
+- **It adapts its plan.** The Critic reopens hypotheses that the data contradicts, and the PI director changes focus, explores or exploits from round to round.
+- **It proposes what to make next.** Beyond the benchmark, it ranks new Li compounds from Materials Project with uncertainty and an applicability-domain check, and files the next experiment for human approval.
+
+## Scope
+- **Retrospective benchmark.** The oracle replays OBELiX measurements; the noise is the dataset's own scatter. This is the standard way to compare discovery strategies before using real lab time.
+- **Seeds.** We ran 6 IonForge seeds, 1–2 per ablation and 50 per baseline, so the agent intervals are wider than the baselines'.
+- **Materials Project candidates.** These are model predictions with stated uncertainty (±2–3 decades), meant to be tested next. They are not discoveries.
+
+## Possible improvements
+Each of these comes from what the campaigns showed, and each would be evaluated on fresh seeds:
+1. **Literature evidence as a surrogate prior.** The scouts' family evidence would enter the surrogate as a prior mean, not only the hypotheses, and speed up the first rounds.
+2. **PI focus families applied directly to the exploit design**, so the planner's batch follows the PI's direction even more closely.
+3. **A family-rotation rule** after two rounds of near-misses in the same family.
+4. **Parallel tool calls off for every Mistral agent**, for fewer retried stages and shorter rounds.
 
 ## Team
 _TODO_
