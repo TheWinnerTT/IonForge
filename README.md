@@ -4,6 +4,8 @@
 
 Hack-Nation · Challenge 03 · Databricks Agentic Scientific Discovery
 
+> **2.4× more top conductors than an expert, in the same 50 experiments** (22 vs 9, median of 6 campaigns), without anyone hand-writing its prior: the agents learn it from the literature.
+
 > AI-generated hypotheses produced by IonForge are not lab-validated.
 
 ## The problem
@@ -212,7 +214,7 @@ This step is filed as a pending human approval. The uncertainties are large (±2
 ## Why IonForge
 A Bayesian optimizer finds superionic conductors fast when someone has already written its prior by hand: the "BO + prior" baseline starts from a ranking of families that an expert hard-coded. IonForge gets there with no hand-made prior and does much more along the way:
 
-- **On par with the strongest baseline, far beyond random and expert heuristics.** It reaches 3 targets 3.6× faster than random search, finds 22 targets in 50 measurements against the expert heuristic's 9, and is on par with the best Bayesian optimizer at 3 targets. From the fifth target on it is ahead of both optimizers, and it ends with the most targets found.
+- **2.4× more top conductors than an expert, in the same 50 experiments.** IonForge finds 22 top-5% conductors in 50 measurements against the expert heuristic's 9. It also finds 40% more than Bayesian optimization with expert priors (22 vs 16) and matches its strongest variant, without the hand-written prior those optimizers need. From the fifth target on, it needs fewer measurements than every baseline.
 - **It builds its own prior from the literature.** The scouts read papers and turn them into evidence cards. Hypotheses come from those cards, so the same lab works on a materials question no expert has encoded yet, where no hand-written prior exists. Ablation 1 measures how much this matters: without the literature, the lab took far longer to reach its first targets.
 - **Every decision is explained and auditable.** Each batch has a hypothesis, three scored designs, a safety review, a Critic's verdict from a different model family, and the PI's direction for the next round. A BO returns a ranking; IonForge returns the reasoning, which is what a scientist needs before spending a week on a synthesis.
 - **Humans stay in control of spending.** No measurement runs without approval on WhatsApp or the dashboard, enforced by an Omnigent policy rather than by a prompt.
