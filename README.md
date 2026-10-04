@@ -252,7 +252,10 @@ Each of these comes from what the campaigns showed, and each would be evaluated 
 
 ## Team
 **Airgap**
-- **Camilo**: lab engine, agents and Omnigent orchestration, benchmark and analysis.
+- **Camilo Bufadel**: lab engine, agents and Omnigent orchestration, benchmark and analysis.
 - **Valentín Castro**: product and dashboard, integrations (Supabase, WhatsApp approvals via Zavu, ElevenLabs voice), judge rounds.
 
 The dashboard is a separate Lovable project (TanStack Start + React) that reads the Supabase tables this repo writes.
+
+## License
+Code: [MIT](LICENSE). Data: `data/pool.csv` is derived from [OBELiX](https://github.com/NRC-Mila/OBELiX) (CC BY 4.0); cite its authors when you reuse it.
