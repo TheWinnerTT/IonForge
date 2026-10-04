@@ -5,7 +5,9 @@ allow-list, own policies and spend cap). The round's sequence is deterministic:
 
   scouts (round 1, three in parallel) -> hypothesis_generator -> screening
   -> experiment_planner -> safety_officer -> lab_runner (measure, behind the Omnigent
-  approval policy) -> critic            [+ closing next_step when the budget is spent]
+  approval policy) -> critic -> pi_director (sets the next round's direction: focus
+  families, explore/exploit/test, which hypotheses to keep or revise)
+                                        [closing next_step instead when the budget is spent]
 
 Agents exchange outputs through the shared research record (results/runs/<run_id>.jsonl,
 mirrored to Supabase). After every stage the driver checks that the stage's decision is in
@@ -107,6 +109,8 @@ class Stage:
             return len(lab.measured) > before["measured"]
         if self.kind == "next_step":
             return bool(lab.events(("next_step",)))
+        if self.kind == "direction":  # recorded after measuring: it directs the next round
+            return bool(events(lab, "direction", lab.round + 1))
         target = lab.round if self.author == "critic" else rnd
         return bool(events(lab, self.kind, target, self.author if self.kind == "review" else None))
 
@@ -127,6 +131,11 @@ def round_stages(rnd: int, remaining: float) -> list[Stage]:
         Stage("critic", "review", "critic", None,
               f"Review the result of round {rnd}, which was just measured."),
     ]
+
+
+def director_stage(rnd: int) -> Stage:
+    return Stage("pi_director", "direction", "pi_director", None,
+                 f"Round {rnd} has been measured and reviewed by the critic. Set the direction of round {rnd + 1}.")
 
 
 def closing_stage() -> Stage:
@@ -276,8 +285,13 @@ def run_round(ctx: dict) -> dict:
             report["failed_at"] = stage.agent
             return report
     lab = open_lab(*ctx["lab_args"])
-    if lab.remaining < 1 and not lab.events(("next_step",)):
-        report["stages"]["closing"] = run_stage(ctx, closing_stage(), rnd)
+    if lab.remaining < 1:
+        if not lab.events(("next_step",)):
+            report["stages"]["closing"] = run_stage(ctx, closing_stage(), rnd)
+    elif events(lab, "direction", rnd + 1):
+        report["stages"]["pi_director"] = {"ok": True, "skipped": "already in the record"}
+    else:  # the PI adapts the plan for the next round; a failure here does not undo the round
+        report["stages"]["pi_director"] = run_stage(ctx, director_stage(rnd), rnd)
     return report
 
 
@@ -299,7 +313,7 @@ def main() -> None:
     args = ap.parse_args()
 
     if args.variant == "smoke":
-        args.budget = min(args.budget, 10)
+        args.budget = min(args.budget, 15)
     bundle = build(args.variant, args.task, args.seed, args.budget, args.usd_cap,
                    mistral_keys=args.mistral_keys, run_id=args.run_id)
     run_id = bundle.name
@@ -313,7 +327,8 @@ def main() -> None:
     print(f"campaign {run_id}: variant={args.variant} budget={args.budget} max_rounds={max_rounds}", flush=True)
     if args.dry_run:
         plan = (["scouts x3 (round 1)"] if ctx["literature"] else []) + [s.agent for s in round_stages(1, args.budget)]
-        print("[dry-run] each round: " + " -> ".join(plan) + "  [+ closing next_step when the budget is spent]")
+        print("[dry-run] each round: " + " -> ".join(plan + ["pi_director"]) +
+              "  [closing next_step instead of pi_director when the budget is spent]")
         return
     failed = 0
     for _ in range(max_rounds):

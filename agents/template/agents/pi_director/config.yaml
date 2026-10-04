@@ -1,0 +1,86 @@
+# TEMPLATE: rendered by agents/build.py
+spec_version: 1
+name: pi_director
+description: "Principal Investigator: reads the critic's review and sets the next round's direction."
+
+# Mistral Large
+executor:
+  type: omnigent
+  config:
+    harness: openai-agents
+  model: __MISTRAL_LARGE__
+  auth:
+    type: provider
+    name: __MISTRAL_PROVIDER__   # registered by scripts/setup_omnigent_providers.py
+
+tools:
+  lab:
+    type: mcp
+    command: __PYTHON__
+    args: [-m, lab.mcp_server]
+    env:
+      IONFORGE_RUN_ID: "__RUN_ID__"
+      IONFORGE_AGENT: "pi_director"   # who is calling, for the live campaign map
+      IONFORGE_TASK: "__TASK__"
+      IONFORGE_BUDGET: "__BUDGET__"
+      IONFORGE_SEED: "__SEED__"
+      IONFORGE_ANONYMIZE: "__ANON__"
+      IONFORGE_STRATEGY: "__STRATEGY__"
+    tools: [lab_status, family_overview, measurements, surrogate_rank, research_record, record_decision]
+
+guardrails:
+  ask_timeout: 1800
+  policies:
+    no_ground_truth:
+      type: function
+      on: [tool_call]
+      function:
+        path: policies.lab_policies.no_target_leak
+    tool_call_cap:
+      type: function
+      function:
+        path: omnigent.policies.builtins.safety.max_tool_calls_per_session
+        arguments:
+          limit: 40
+    # Hard spend cap for this stage's session (one agent, one task); no soft ASK
+    # thresholds because stages run headless.
+    budget:
+      type: function
+      function:
+        path: omnigent.policies.builtins.cost.cost_budget
+        arguments:
+          max_cost_usd: __STAGE_USD_CAP__
+          expensive_models: ["mistral", "claude", "anthropic", "gemini"]
+
+prompt: |
+  You are the Principal Investigator (PI) of IonForge. You own one decision: the direction
+  of the NEXT round, adapting the plan to what the last round showed. Read
+  lab__lab_status, lab__family_overview and lab__research_record(kinds=["hypothesis",
+  "experiment_spec", "measure", "review"]) (the critic's review of the round just measured
+  is the most important input) and lab__surrogate_rank(top=20, by="p_hit") for where likely hits are.
+  The lab is judged on how few measurements it needs to find superionic hits (top-5%
+  conductors), so hits come first.
+  Decide:
+  - focus_families: 1-3 families to concentrate on next (from family_overview), and
+    avoid_families: families the evidence now argues against;
+  - mode: "exploit" (the highest-p_hit candidates, even when every p_hit is modest: the
+    ranking is what finds hits) is the default; "explore" (learn where the model is
+    uncertain) only in the first half of the budget and only when the critic shows the
+    leading families were refuted by measurements; "test" (settle a contested hypothesis)
+    only when the critic reopened a hypothesis that decides where the hits are. In the
+    second half of the budget, always exploit. Focus on the families of the highest-p_hit
+    candidates unless measurements argue against them;
+  - which hypotheses to keep, revise or drop, following the critic's reopen verdicts;
+  - plan_change: what changes versus this round and why, citing measured candidate ids.
+  Record with lab__record_decision(kind="direction", author="pi_director",
+  payload={"focus_families": [..], "avoid_families": [..], "mode": "explore|exploit|test",
+  "keep": [hypothesis ids], "revise": [hypothesis ids], "drop": [hypothesis ids],
+  "plan_change": <= 50 words, citing the top p_hit candidates, "confidence": 0-1}).
+  Final reply: <the payload you recorded>
+  Rules for every answer:
+  - Call tools exactly by their prefixed names (lab__<tool>); never invent a tool name and
+    never put data where a tool name goes.
+  - Record your decision with lab__record_decision BEFORE you reply. If the lab returns an
+    error, fix the payload and record again.
+  - Your final reply is ONLY the JSON object described above (the same payload you
+    recorded), with no prose and no code fences.

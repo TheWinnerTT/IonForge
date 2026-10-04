@@ -11,7 +11,7 @@ Variants (strategy = `runs.strategy` in supabase/schema.sql)
   live            ionforge         human approval on WhatsApp / dashboard before every measurement
   live_judges     ionforge         judge-triggered rounds: dashboard approval only, 90 s timeout (run id keeps "-live-")
   smoke           ionforge         end-to-end test: demo keys, approval auto-granted and logged,
-                                   budget 10 measurements = 2 rounds (excluded from all statistics)
+                                   budget 15 measurements = 3 rounds (excluded from all statistics)
   bench           ionforge         approval auto-granted and logged: overnight campaigns
   ablation_nolit  ablation_no_lit  bench without the literature tools (Ablation 1)
   ablation_anon   ablation_anon    bench with formulas and families hidden (Ablation 2)
@@ -20,11 +20,11 @@ Bench run ids are deterministic (<strategy>-<task>-s<seed>), so an interrupted
 campaign resumes from its research record. Live and smoke run ids carry a timestamp,
 so each rehearsal starts a fresh lab.
 
-Models (override in .env): Mistral is the lab's engine; the Critic is Claude through
+Models (override in .env): Mistral is the lab's engine; the Critic is Gemini through
 OpenRouter, a different family from the Mistral Hypothesis Generator.
   PI, Hypothesis Generator, Screening, Planner   MISTRAL_LARGE_MODEL  (mistral-large-latest)
   Safety Officer, Literature Scouts              MISTRAL_SMALL_MODEL  (mistral-small-latest)
-  Critic                                         CRITIC_MODEL         (anthropic/claude-sonnet-5.5)
+  Critic                                         CRITIC_MODEL         (google/gemini-3.8-flash)
   PI_ENGINE=claude moves only the PI to Claude Sonnet on OpenRouter (fallback if a
   Mistral PI does not coordinate well).
 
@@ -54,7 +54,7 @@ load_dotenv(ROOT / ".env")
 
 MISTRAL_LARGE = os.getenv("MISTRAL_LARGE_MODEL", "mistral-large-latest")
 MISTRAL_SMALL = os.getenv("MISTRAL_SMALL_MODEL", "mistral-small-latest")
-CRITIC_MODEL = os.getenv("CRITIC_MODEL", "anthropic/claude-sonnet-5.5")
+CRITIC_MODEL = os.getenv("CRITIC_MODEL", "google/gemini-3.8-flash")
 PI_ENGINE = os.getenv("PI_ENGINE", "mistral")
 CLAUDE_PI_MODEL = os.getenv("CLAUDE_PI_MODEL", "anthropic/claude-sonnet-5.5")
 
@@ -178,7 +178,7 @@ def main() -> None:
                     help="override which Mistral key the agents use (OpenRouter is unchanged)")
     args = ap.parse_args()
     if args.variant == "smoke":
-        args.budget = min(args.budget, 10)
+        args.budget = min(args.budget, 15)
     for v in list(VARIANTS) if args.variant == "all" else [args.variant]:
         missing = missing_keys(v, args.mistral_keys)
         if missing:

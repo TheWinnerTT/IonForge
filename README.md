@@ -47,10 +47,13 @@ flowchart LR
   SA -- approved --> LR[Lab Runner]
   SA -. WhatsApp .-> H((Scientist))
   LR -- Result --> CR[Critic]
+  CR -- review --> PI[PI director]
   CR -- reopen --> HG
-  CR -- decision --> PL
+  PI -- direction for next round --> HG
+  PI -- direction for next round --> PL
   LR --> REC[(Research log)]
   CR --> REC
+  PI --> REC
 ```
 
 | Agent | Decision it owns | Model |
@@ -60,25 +63,50 @@ flowchart LR
 | Screening | Which candidates satisfy each hypothesis | Mistral Large + RF surrogate |
 | Experiment Planner | Which batch to measure (scores 3 designs per round) | Mistral Large |
 | Safety & approval | Whether spending is allowed | Mistral Small + Omnigent policy `measure_gate` (WhatsApp via Zavu / dashboard) |
-| Lab Runner | Runs the measurement | Code only |
-| Critic | Whether the conclusion holds | Claude Sonnet via OpenRouter (different family from the hypothesis generator, on purpose) |
-| PI (orchestrator) | Runs each round; the only agent allowed to call `measure` | Mistral Large |
+| Lab Runner | Runs the measurement; the only agent allowed to call `measure` | Mistral Small + Omnigent policy `measure_gate` |
+| Critic | Whether the conclusion holds | Gemini Flash via OpenRouter (different family from the hypothesis generator, on purpose) |
+| PI director | Direction of the next round: focus families, explore / exploit / test, which hypotheses to keep or drop | Mistral Large |
 
-**Models and keys.** Mistral is the lab's engine: Mistral Large for the decisions and the candidate selection (PI, Hypothesis Generator, Screening, Experiment Planner) and Mistral Small for Safety and the Literature Scouts. The lab server validates every decision (no unknown candidate ids, no closing a campaign early or without a critic review). The Critic is Claude Sonnet through OpenRouter, deliberately a different model family from the hypothesis generator. Every agent runs on Omnigent's lean `openai-agents` harness. `scripts/setup_omnigent_providers.py` registers the providers, which read keys from `.env` (never stored in bundles or in Omnigent). The live demo and the overnight campaigns use separate Mistral and OpenRouter keys, so a campaign can never spend the demo budget.
+**Models and keys.** Mistral is the lab's engine: Mistral Large for the decisions and the candidate selection (PI director, Hypothesis Generator, Screening, Experiment Planner) and Mistral Small for Safety, the Lab Runner and the Literature Scouts. The lab server validates every decision (no unknown candidate ids, no closing a campaign early or without a critic review). The Critic is Gemini Flash through OpenRouter, deliberately a different model family from the hypothesis generator. Every agent runs on Omnigent's lean `openai-agents` harness. `scripts/setup_omnigent_providers.py` registers the providers, which read keys from `.env` (never stored in bundles or in Omnigent). The live demo and the overnight campaigns use separate Mistral and OpenRouter keys, so a campaign can never spend the demo budget.
 
-**One session per round.** `scripts/run_campaign.py` runs each round of the discovery loop as a fresh Omnigent session. The research record carries the state between rounds, so the PI's context never grows, a failed round can be retried, and no session approaches Omnigent's 30-minute headless limit. The driver stops when the budget is spent or after two rounds without progress. Each round session also has a hard spend cap enforced by an Omnigent cost policy.
+**A round, stage by stage.** Each agent is its own Omnigent agent (`agents/template/agents/<name>/config.yaml`) and runs as its own Omnigent session: scouts ×3 in parallel (round 1 only) → Hypothesis Generator → Screening → Experiment Planner → Safety Officer → Lab Runner (`measure`, behind the approval gate) → Critic → PI director, who sets the next round's direction. When the budget is spent, the Planner writes the campaign's closing next step instead. Agents share state only through the research record (`results/runs/<run_id>.jsonl`, mirrored live to Supabase by `lab/sync.py`), so no context grows across rounds and an interrupted campaign resumes where it stopped.
 
-**How it runs on Omnigent.** `agents/template/` is a directory bundle: the PI plus six sub-agents, each with its own MCP tool allow-list (`lab/mcp_server.py`, `literature/mcp_server.py`). Only the PI can call `measure`, and the Omnigent policy `policies/lab_policies.py::measure_gate` checks every call (rationale, hypothesis id and chosen design required, ≤ 5 per round, no repeated batch) and holds it until the scientist answers YES/NO on WhatsApp or presses Approve/Deny on the dashboard. Every decision goes to a JSONL research record (`results/runs/`) that is mirrored live to Supabase (`lab/sync.py`).
+### What Omnigent decides, and what the Python driver does
+The brief asks Omnigent to orchestrate the live discovery workflow. In IonForge, every decision that steers the science, and every control on spending and safety, happens inside Omnigent. The stage order is fixed in `scripts/run_campaign.py`, on purpose.
+
+**Decided and enforced by Omnigent**
+- **Policies on every tool call** (`policies/lab_policies.py`, Omnigent guardrails):
+  - `measure_gate` holds each measurement until a human answers YES/NO on WhatsApp (Zavu) or Approve/Deny on the dashboard. It refuses a batch without a rationale of ≥ 40 characters, a hypothesis id and a chosen design, a batch of more than 5, or a repeated batch.
+  - `no_target_leak` blocks any attempt to read hidden conductivities.
+  - Omnigent's built-in `max_tool_calls_per_session` stops runaway loops.
+- **Allow-lists:** each agent sees only the MCP tools in its own `tools:` list. Only the Lab Runner can call `measure`. Only Screening, the Planner and the PI director can query the surrogate. The scouts alone have the literature server, and the no-literature ablation removes it from the bundle entirely.
+- **Spend caps:** Omnigent's `cost_budget` policy gives every agent session a hard USD cap (`--stage-usd-cap`). Each agent is pinned to an explicit provider, so nothing can fall back to a personal subscription. Demo and campaign keys are separate providers.
+- **Adapting the plan:** the PI director, an Omnigent agent on Mistral Large, reads the Critic's review and the surrogate ranking. It records the next round's direction: focus families, avoided families, explore / exploit / test, and which hypotheses to keep, revise or drop. The Hypothesis Generator must follow it, and the Planner follows it unless the expected hits argue otherwise.
+- **Every scientific choice** is made by an agent and recorded with its reasoning: the hypotheses, the candidate sets, the batch chosen among three scored designs, the safety review and the critique.
+
+**Done by the Python driver** (`scripts/run_campaign.py`)
+- Launches the stages in a fixed order: `omnigent run agents/<name> -p <task>`.
+- Checks that each agent recorded its decision. It retries a failed session up to 3 times and records the agent's final JSON when the agent replied without recording it (logged as `recorded_by: "driver"`).
+- Stops when the budget is spent.
+- It never chooses a hypothesis, a candidate or a direction.
+
+The lab server (`lab/mcp_server.py`) validates every decision before it enters the record:
+- no unknown or already-measured candidate ids;
+- no direction or closing without a Critic review;
+- no batch that gives up clearly more expected hits than the best scored design without a stated reason, and none at all in the second half of the budget;
+- no placeholder closing.
+
+**Why the sequencing is code.** The first version had a root PI agent (`agents/template/config.yaml`) dispatch the sub-agents through Omnigent. It worked, but a round took ~17 minutes and ~$0.60, and the PI sometimes skipped the Critic. A science loop whose review step is optional is not trustworthy, so the order became deterministic and the judgement stayed with the agents. The same stages now take ~4 minutes per round, and every round in our 3-round tests completed with its Critic review.
 
 ## Repository
 ```
-agents/        Omnigent bundle: template/ (PI + 6 sub-agents) rendered by build.py into build/<run_id>/
+agents/        Omnigent bundle: template/agents/ (8 agents, one Omnigent session each) rendered by build.py into build/<run_id>/
 policies/      spend cap, mandatory approval for measure(), loop detection
 lab/           oracle, MCP lab server, features, surrogate, baselines, metrics, analysis, Supabase sync
 literature/    openalex/arXiv, BrightData SERP, Mistral OCR, card extraction, citation check, no-leak filter, MCP server
 integrations/  critic (OpenRouter), zavu (WhatsApp approvals), elevenlabs (voice), supabase_sync
 supabase/      schema.sql + zavu-webhook edge function
-scripts/       EDA, demo data seed/clear
+scripts/       round driver (run_campaign.py), overnight plan, Omnigent provider setup, demo data seed/clear
 docs/          EDA notes, Lovable prompt
 results/       JSON results and figures
 ```
@@ -90,11 +118,12 @@ cp .env.example .env             # fill in keys
 make data                        # OBELiX -> data/pool.csv, results/eda_summary.json
 make features baselines compare  # descriptors, 5 baselines x 50 seeds, descriptor choice (no API key needed)
 make scouts                      # [API] evidence cards for sulfides / oxides / halides (cached)
-make smoke                       # [API] 2-round end-to-end test
+make smoke                       # [API] 3-round end-to-end test on the demo keys
 make live ROUNDS=3               # [API] live demo with WhatsApp / dashboard approvals
 make bench SEED=0                # [API] one unattended IonForge campaign (10 rounds)
 make ablations SEED=0            # [API] no-literature and anonymized ablations
 make campaigns                   # [API] overnight: IonForge x5, each ablation x3
+make discover                    # [API, free] new candidates from Materials Project (top 10 + uncertainty)
 make analyze publish             # campaigns vs baselines; curves to the dashboard
 ```
 `make help` lists every target. Before the demo: `python scripts/clear_demo_data.py`.
@@ -115,7 +144,25 @@ Cold-start BO fails with any acquisition function we tried: five random first me
 **IonForge:** _TODO, campaigns pending (`make bench`, then `make analyze`)._
 
 ## Next experiment
-_TODO: top out-of-dataset candidates from Materials Project with uncertainty and applicability-domain check._
+The campaigns rediscover materials whose conductivity is already known. `make discover` (`lab/discovery.py`) points the lab at materials nobody has measured as electrolytes:
+
+1. **Search Materials Project.** It looks for Li compounds that are nearly stable (E above hull ≤ 0.05 eV/atom), insulating (band gap ≥ 3 eV) and have 3–6 elements. That gives **1,970** compounds; **1,159** of them are not in OBELiX.
+2. **Predict conductivity.** The random forest uses the lab's descriptors and is trained on all 599 OBELiX measurements. It predicts log σ, with an uncertainty taken from the spread across trees, and the probability of reaching the top-5% target.
+3. **Check the applicability domain.** For each compound, it takes the mean distance to the 5 nearest OBELiX materials in standardized descriptor space and compares it with the 95th percentile of the same distance within OBELiX. **547** compounds fall inside the domain. The rest are ranked separately instead of being presented as confident picks.
+
+| # | Material | MP id | Predicted log σ | ± | P(top 5%) | Nearest measured material |
+|---|---|---|---|---|---|---|
+| 1 | Li3ScCl6 | mp-686004 | −4.6 | 2.4 | 17% | Li3YCl6 (halide) |
+| 2 | Li7VN4 | mp-4604 | −5.5 | 2.7 | 12% | Li3N (nitride) |
+| 3 | NaLi2Cl3 | mp-3346843 | −5.4 | 2.5 | 10% | Li2MgCl4 |
+
+The full top 10 in the domain, plus the top 5 outside it, is in `results/candidates.json` and in the dashboard's `candidates` table.
+
+**Proposed next experiment for the top 3:**
+1. AIMD at 600–1000 K to estimate Li diffusivity and activation energy.
+2. If Ea < 0.35 eV, solid-state synthesis and room-temperature impedance spectroscopy.
+
+This step is filed as a pending human approval. The uncertainties are large (±2–3 decades), so these are hypotheses to test, not discoveries.
 
 ## Limitations
 _TODO_

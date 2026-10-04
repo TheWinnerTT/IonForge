@@ -81,7 +81,7 @@ def chemistry(formula: str) -> dict[str, float]:
     return out
 
 
-def matminer_features(formulas: list[str]) -> pd.DataFrame:
+def matminer_features(formulas: list[str], n_jobs: int | None = None) -> pd.DataFrame:
     from matminer.featurizers.base import MultipleFeaturizer
     from matminer.featurizers.composition import ElementProperty, Stoichiometry, ValenceOrbital
 
@@ -90,6 +90,8 @@ def matminer_features(formulas: list[str]) -> pd.DataFrame:
         Stoichiometry(),
         ValenceOrbital(props=["frac"]),
     ])
+    if n_jobs:
+        feat.set_n_jobs(n_jobs)
     df = pd.DataFrame({"formula": formulas})
     df["composition"] = [_safe_comp(f) for f in formulas]
     ok = df["composition"].notna()

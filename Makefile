@@ -10,7 +10,7 @@ ROUNDS ?= 3
 # cannot fetch model prices and its cost policy denies every call.
 LOAD_ENV := set -a; [ -f .env ] && source .env; set +a; export SSL_CERT_FILE="$${SSL_CERT_FILE:-$$($(PY) -m certifi)}"; eval "$$($(PY) scripts/openrouter_keys.py --export)"
 
-.PHONY: help setup data features baselines compare agents scouts smoke live bench ablations campaigns judge-runner voice analyze publish reproduce clean-runs
+.PHONY: help setup data features baselines compare agents scouts smoke live bench ablations campaigns judge-runner voice discover analyze publish reproduce clean-runs
 
 help:             ## list targets
 	@grep -E '^[a-z-]+:.*##' Makefile | sed 's/:.*##/ —/'
@@ -39,7 +39,7 @@ scouts:           ## [API] evidence cards for the 3 families (cached; agents reu
 agents:           ## render the Omnigent bundles for TASK and SEED
 	$(PY) agents/build.py --variant all --task $(TASK) --seed $(SEED)
 
-smoke:            ## [API] 2-round end-to-end test on the demo keys (excluded from statistics)
+smoke:            ## [API] 3-round end-to-end test on the demo keys (excluded from statistics)
 	$(LOAD_ENV); $(PY) scripts/run_campaign.py --variant smoke --task $(TASK)
 
 live:             ## [API] live demo: ROUNDS rounds, approval on WhatsApp / dashboard before each measurement
@@ -61,6 +61,9 @@ judge-runner:     ## [API] serve the dashboard's "Run one round" button (needs J
 
 voice:            ## [API] the lab's voice: ElevenLabs briefings + read-aloud clips, refreshes the Ask-the-lab agent
 	$(LOAD_ENV); $(PY) scripts/voice_worker.py
+
+discover:         ## [API, free] new Li candidates from Materials Project: top 10 + uncertainty + domain check, top 3 to approval
+	$(LOAD_ENV); $(PY) -m lab.discovery
 
 analyze:          ## agent campaigns vs baselines: speed-up, hits, families
 	$(PY) -m lab.analyze --task $(TASK)
