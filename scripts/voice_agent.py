@@ -160,9 +160,9 @@ def agent_config(kb_id: str) -> dict:
             # The widget's look is set here (it renders in a shadow DOM the dashboard cannot style).
             "widget": {
                 "variant": "compact", "placement": "bottom-right",
-                "bg_color": "#0B0F14", "text_color": "#E6EDF3", "border_color": "#1F2933",
+                "bg_color": "#141D27", "text_color": "#E6EDF3", "border_color": "#3A4B5C",
                 "btn_color": "#0D6A88", "btn_text_color": "#FFFFFF", "focus_color": "#2BB3D9",
-                "border_radius": 14, "btn_radius": 999,
+                "border_radius": 16, "btn_radius": 20,
                 "avatar": {"type": "orb", "color_1": "#0D6A88", "color_2": "#C4123A"},
                 "action_text": "Ask the lab", "start_call_text": "Ask a question", "end_call_text": "End",
                 "expand_text": "Ask the lab", "listening_text": "Listening…", "speaking_text": "The lab is answering",
@@ -173,11 +173,14 @@ def agent_config(kb_id: str) -> dict:
                                   "new_call": "Ask again", "listening_status": "Listening…",
                                   "speaking_status": "The lab is answering", "connecting_status": "Connecting…",
                                   "input_placeholder": "Type a question for the lab"},
-                "styles": {"base": "#0B0F14", "base_hover": "#111821", "base_active": "#16202B",
-                           "base_border": "#1F2933", "base_subtle": "#8B98A5", "base_primary": "#E6EDF3",
+                # the chat sheet must stand out from the dashboard's own #0B0F14 background
+                "styles": {"base": "#141D27", "base_hover": "#1A2531", "base_active": "#1F2C3A",
+                           "base_border": "#3A4B5C", "base_subtle": "#8B98A5", "base_primary": "#E6EDF3",
                            "accent": "#0D6A88", "accent_hover": "#0F7C9E", "accent_active": "#0B5C76",
                            "accent_border": "#0D6A88", "accent_subtle": "#CDEBF4", "accent_primary": "#FFFFFF",
-                           "button_radius": 999},
+                           # explicit radii: a huge button_radius made the whole chat sheet render as a clipped circle
+                           "button_radius": 20, "input_radius": 12, "bubble_radius": 14,
+                           "sheet_radius": 18, "compact_sheet_radius": 18, "dropdown_sheet_radius": 12},
             },
         },
     }
