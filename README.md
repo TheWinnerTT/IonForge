@@ -8,6 +8,13 @@ Hack-Nation · Challenge 03 · Databricks Agentic Scientific Discovery
 
 > AI-generated hypotheses produced by IonForge are not lab-validated.
 
+## Try it live
+**[ion-forge-dash.lovable.app](https://ion-forge-dash.lovable.app)**, the lab's dashboard, reads the same research log the agents write (Supabase, live).
+- **Live Lab:** replay a real campaign agent by agent (*Watch the lab work*), switch campaigns with the run selector, or press **Run one round** when the lab is online. Judge rounds are rate-limited, need an approval on the dashboard and are excluded from the benchmark statistics; when the lab is offline the page offers the replay.
+- **Evidence:** every literature card with its DOI and quote (verified word for word where marked), plus the cards blocked by the no-leak rule.
+- **Results:** discovery curves against the five baselines, and the next candidates from Materials Project.
+- **Ask the lab** (bottom right): start a voice call to talk or type, and the lab answers aloud and in text, or open the text chat. It answers from the research log (an ElevenLabs agent on Gemini Flash).
+
 ## The problem
 Solid electrolytes would make lithium batteries non-flammable, but they need σ ≥ 10⁻³ S/cm at room temperature. Each real measurement (synthesis + impedance spectroscopy) takes days, so the bottleneck is **choosing which experiment to run next**.
 
@@ -120,7 +127,7 @@ policies/      spend cap, mandatory approval for measure(), loop detection
 lab/           oracle, MCP lab server, features, surrogate, baselines, metrics, analysis, Supabase sync
 literature/    openalex/arXiv, BrightData SERP, Mistral OCR, card extraction, citation check, no-leak filter, MCP server
 integrations/  critic (OpenRouter), zavu (WhatsApp approvals), elevenlabs (voice), supabase_sync
-supabase/      schema.sql + zavu-webhook edge function
+supabase/      schema.sql, migrations/ (live activity, judge rounds, voice clips), zavu-webhook edge function
 scripts/       round driver (run_campaign.py), overnight plan, Omnigent provider setup, demo data seed/clear
 docs/          EDA notes, Lovable prompt
 results/       JSON results and figures
@@ -244,4 +251,8 @@ Each of these comes from what the campaigns showed, and each would be evaluated 
 4. **Parallel tool calls off for every Mistral agent**, for fewer retried stages and shorter rounds.
 
 ## Team
-_TODO_
+**Airgap**
+- **Camilo**: lab engine, agents and Omnigent orchestration, benchmark and analysis.
+- **Valentín Castro**: product and dashboard, integrations (Supabase, WhatsApp approvals via Zavu, ElevenLabs voice), judge rounds.
+
+The dashboard is a separate Lovable project (TanStack Start + React) that reads the Supabase tables this repo writes.
