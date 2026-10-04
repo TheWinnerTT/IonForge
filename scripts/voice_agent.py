@@ -157,6 +157,18 @@ def agent_config(kb_id: str) -> dict:
         "platform_settings": {
             "call_limits": {"agent_concurrency_limit": 2, "daily_limit": 40, "bursting_enabled": False},
             "auth": {"enable_auth": False, "allowlist": [{"hostname": x} for x in HOSTS]},
+            # The widget's look is set here (it renders in a shadow DOM the dashboard cannot style).
+            "widget": {
+                "variant": "compact", "placement": "bottom-right",
+                "bg_color": "#0B0F14", "text_color": "#E6EDF3", "border_color": "#1F2933",
+                "btn_color": "#0D6A88", "btn_text_color": "#FFFFFF", "focus_color": "#2BB3D9",
+                "border_radius": 14, "btn_radius": 999,
+                "avatar": {"type": "orb", "color_1": "#0D6A88", "color_2": "#C4123A"},
+                "action_text": "Ask the lab", "start_call_text": "Ask a question", "end_call_text": "End",
+                "expand_text": "Ask the lab", "listening_text": "Listening…", "speaking_text": "The lab is answering",
+                "transcript_enabled": True, "text_input_enabled": True, "disable_banner": True,
+                "show_conversation_id": False,
+            },
         },
     }
 
