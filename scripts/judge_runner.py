@@ -27,7 +27,6 @@ import argparse
 import json
 import os
 import signal
-import socket
 import subprocess
 import sys
 import time
@@ -57,7 +56,7 @@ QUEUE_TTL = timedelta(minutes=15)
 STALE_RUNNING = timedelta(minutes=40)
 ROUND_TIMEOUT_S = 30 * 60
 POLL_S = 5
-EXECUTOR = os.getenv("JUDGE_EXECUTOR") or f"laptop-{socket.gethostname().split('.')[0]}"
+EXECUTOR = os.getenv("JUDGE_EXECUTOR") or "laptop"  # public in runner_status: no hostname (it can contain a name)
 RECORDS = ROOT / "results" / "runs"
 LOGS = ROOT / "results" / "logs" / "judge-runner"
 FINISHED = ("done", "expired", "denied", "failed", "cancelled", "rejected")
