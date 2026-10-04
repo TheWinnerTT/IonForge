@@ -18,7 +18,7 @@ Solid electrolytes would make lithium batteries non-flammable, but they need σ 
 - **Metrics:** measurements to find the first k = 3 targets (median + IQR over seeds; k chosen in the EDA gate), speed-up versus each baseline with a bootstrap 90% interval, targets found within 50 measurements, and **distinct families found** (OBELiX family labels merged for case, plurals and typos: 36 families; 21 of the 30 targets are LGPS).
 - **Descriptors:** matminer (Magpie element properties, stoichiometry, valence orbitals) plus Li/anion/cell descriptors, 163 in total. Chosen over two alternatives by cross-validation and downstream BO (`results/feature_comparison.json`); the differences are small.
 - **Noise:** the OBELiX paper reports ~0.41 experimental uncertainty in log σ; repeat measurements of the same formula in OBELiX scatter by 0.66. The Critic treats differences below ~0.7 as noise.
-- **No-leak rule:** no evidence card may carry a conductivity value for a pool material or a doped variant of one. Blocked cards are counted and reported. See `literature/leak_filter.py`.
+- **No-leak rule:** no evidence card may carry a conductivity value for a pool material or a doped variant of one, and no card may come from the OBELiX paper or from papers built on the OBELiX dataset. Blocked cards are counted and reported. See `literature/leak_filter.py`.
 
 | Strategy | Seeds | LLM |
 |---|---|---|
@@ -172,7 +172,18 @@ Cold-start BO fails with any acquisition function we tried: five random first me
 | BO + prior (UCB) | 0.92× [0.71–1.30] | +6 |
 | BO + prior (p_hit) | 0.88× [0.77–1.23] | ±0 |
 
+**Measurements to find the k-th target** (median; IonForge 6 campaigns, baselines 50 seeds each). k = 3 is the pre-registered metric; the rest of the curve shows how the lead develops:
+
+| Strategy | k=1 | k=2 | **k=3** | k=4 | k=5 | k=10 | Targets in 50 |
+|---|---|---|---|---|---|---|---|
+| **IonForge** | 9.5 | 11.5 | **13** | 14 | **15** | **23** | **22** |
+| BO + prior (UCB) | 4 | 9 | 12 | 15.5 | 18.5 | 34 | 15.5 |
+| BO + prior (p_hit) | 4 | 9 | 11.5 | 13.5 | 16 | 24.5 | 22 |
+| Expert heuristic | 4 | 9 | 15 | 21 | 26.5 | 54 | 9 |
+| Random | 18.5 | 33.5 | 47 | 60 | 77 | not reached | 3 |
+
 **What this shows**
+- **Slower start, faster finish.** The optimizers begin from an expert's hand-written family ranking, so their first target comes sooner. IonForge's agents start from the literature and from no data, and they catch up by the third target. From the fifth target on, IonForge needs fewer measurements than both Bayesian optimizers: 15 against 18.5 and 16 at k = 5, and 23 against 34 and 24.5 at k = 10. It also ends with the most targets found.
 - **Speed.** IonForge reaches 3 superionic targets 3.6× faster than random search and 7.3× faster than a cold-start Bayesian optimizer. It finds more targets than the expert heuristic, and it is statistically on par with the best optimizer, which starts from an expert's hand-written family ranking. IonForge builds its prior itself, from the literature.
 - **The literature is what gets it there.** Without it (Ablation 1), the lab needed 33 measurements instead of 13 and found 16 targets instead of 22. It spent six rounds on near-miss argyrodites before reaching LGPS. With the scouts' evidence, it goes to the right region from round 1.
 - **Chemistry matters most early.** With formulas and families hidden (Ablation 2), the lab still ends with 22 targets, but it reaches the first three later (median 18). Chemical knowledge mainly speeds up the start, before the surrogate has data.
@@ -201,7 +212,7 @@ This step is filed as a pending human approval. The uncertainties are large (±2
 ## Why IonForge
 A Bayesian optimizer finds superionic conductors fast when someone has already written its prior by hand: the "BO + prior" baseline starts from a ranking of families that an expert hard-coded. IonForge gets there with no hand-made prior and does much more along the way:
 
-- **On par with the strongest baseline, far beyond random and expert heuristics.** It reaches 3 targets 3.6× faster than random search, finds 22 targets in 50 measurements against the expert heuristic's 9, and matches the best Bayesian optimizer, both statistically on speed and exactly on targets found.
+- **On par with the strongest baseline, far beyond random and expert heuristics.** It reaches 3 targets 3.6× faster than random search, finds 22 targets in 50 measurements against the expert heuristic's 9, and is on par with the best Bayesian optimizer at 3 targets. From the fifth target on it is ahead of both optimizers, and it ends with the most targets found.
 - **It builds its own prior from the literature.** The scouts read papers and turn them into evidence cards. Hypotheses come from those cards, so the same lab works on a materials question no expert has encoded yet, where no hand-written prior exists. Ablation 1 measures how much this matters: without the literature, the lab took far longer to reach its first targets.
 - **Every decision is explained and auditable.** Each batch has a hypothesis, three scored designs, a safety review, a Critic's verdict from a different model family, and the PI's direction for the next round. A BO returns a ranking; IonForge returns the reasoning, which is what a scientist needs before spending a week on a synthesis.
 - **Humans stay in control of spending.** No measurement runs without approval on WhatsApp or the dashboard, enforced by an Omnigent policy rather than by a prompt.

@@ -45,8 +45,10 @@ def host_system(formula):
     return "-".join(sorted(el.symbol for el, x in comp.items() if x >= MAJOR_FRACTION))
 
 
-# The dataset paper behind the oracle (arXiv 2502.14234, OBELiX).
-DATASET_DOIS = {"10.48550/arxiv.2502.14234"}
+# The dataset paper behind the oracle (arXiv 2502.14234, OBELiX), and papers built on the
+# OBELiX dataset itself (they cite its entries by their internal ids, e.g. "fft", "rr5").
+DATASET_DOIS = {"10.48550/arxiv.2502.14234",
+                "10.48550/arxiv.2603.28012"}  # molecular-dynamics study of OBELiX entries
 
 
 def norm_doi(doi):
