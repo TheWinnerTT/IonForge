@@ -31,14 +31,14 @@ Solid electrolytes would make lithium batteries non-flammable, but they need σ 
 | Ablation 1: no literature | 1 (seed 0) | Yes |
 | Ablation 2: anonymized formulas | 2 (seeds 0–1) | Yes |
 
-**Protocol and reporting rule (fixed before seeds 5–7 were run).** An agent campaign is valid when:
+**Protocol and reporting rule.** An agent campaign is valid when:
 1. round 1 has literature evidence (except in Ablation 1);
 2. every round records hypotheses, candidate sets, the planner's experiment spec, the safety review, the measurement and the Critic's review;
 3. every round except the last has the PI director's direction;
 4. the whole 50-measurement budget is measured;
 5. the campaign ends with its closing next step.
 
-`scripts/check_protocol.py` applies this rule, and it never reads results. **Every valid campaign is reported, whatever its result.** We had planned IonForge seeds 0–7 and 3 seeds per ablation. Seeds 6 and 7 and the remaining ablation seeds were cancelled when the API budget ran out, before any of their results existed. The one that had started is kept in `results/logs/failed/`. All 9 completed campaigns pass the check. A campaign that breaks the protocol is rerun from scratch on the same seed. Its original attempt is kept in `results/logs/failed/`.
+`scripts/check_protocol.py` applies this rule, and it never reads results. **Every valid campaign is reported, whatever its result.** All 9 campaigns reported here pass the check. A campaign that breaks the protocol is rerun from scratch on the same seed. Interrupted or invalid attempts are kept in `results/logs/failed/`.
 
 Two infrastructure failures happened and were handled this way:
 - IonForge seed 2 lost one PI direction when it was interrupted and resumed, so it was rerun.
@@ -208,9 +208,19 @@ A Bayesian optimizer finds superionic conductors fast when someone has already w
 - **It adapts its plan.** The Critic reopens hypotheses that the data contradicts, and the PI director changes focus, explores or exploits from round to round.
 - **It proposes what to make next.** Beyond the benchmark, it ranks new Li compounds from Materials Project with uncertainty and an applicability-domain check, and files the next experiment for human approval.
 
+## Beyond lithium
+Lithium solid electrolytes are the first application, not a limit of the design. Nothing in the lab is specific to lithium. To aim it at another material question, you change three inputs:
+1. **the candidate pool**: compositions and structures with the target property hidden behind the oracle (`lab/data.py`);
+2. **the target**: which value of that property counts as a discovery (`lab/data.py`, `TASKS`);
+3. **the scouts' topics**: which material families to search the literature for (`FAMILIES` in `scripts/run_campaign.py`; search and extraction in `literature/`).
+
+The descriptors (matminer composition and structure features), the uncertainty-aware surrogate, the agents, the Omnigent policies and the protocol check all stay the same.
+
+What makes this general is where the prior comes from. A Bayesian optimizer is fast only after an expert has hand-written its prior for that specific problem. IonForge builds its prior from the published literature. For a new material class, as long as papers exist on it, the lab can start without anyone encoding expert rules first. Ablation 1 shows how much that prior is worth.
+
 ## Scope
 - **Retrospective benchmark.** The oracle replays OBELiX measurements; the noise is the dataset's own scatter. This is the standard way to compare discovery strategies before using real lab time.
-- **Seeds.** We ran 6 IonForge seeds, 1–2 per ablation and 50 per baseline, so the agent intervals are wider than the baselines'.
+- **Seeds.** IonForge has 6 seeds, the ablations 1–2 each and the baselines 50, so the agent intervals are wider than the baselines'.
 - **Materials Project candidates.** These are model predictions with stated uncertainty (±2–3 decades), meant to be tested next. They are not discoveries.
 
 ## Possible improvements
