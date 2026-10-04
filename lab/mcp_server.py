@@ -341,6 +341,15 @@ def record_decision(kind: str, author: str, payload: dict) -> dict:
     return {"ok": True, "run_id": lab.run_id}
 
 
+def _chosen_label(payload: dict) -> str:
+    """'Chose exploit for H1 · 5 candidates' (planners write chosen_design, chosen or design)."""
+    design = payload.get("chosen_design") or payload.get("chosen") or payload.get("design")
+    target = f" for {payload['hypothesis_id']}" if payload.get("hypothesis_id") else ""
+    n = len(payload.get("candidate_ids") or [])
+    head = f"Chose {design}" if design else "Chose a design"
+    return f"{head}{target}" + (f" · {n} candidates" if n else "")
+
+
 def _recorded(kind: str, payload: dict) -> str:
     """One readable line for the live map, e.g. 'Proposed H2: Lu substitution ...'."""
     if kind == "review":
@@ -359,7 +368,7 @@ def _recorded(kind: str, payload: dict) -> str:
     text = (payload.get("statement") or payload.get("trend") or payload.get("summary") or payload.get("plan_change")
             or payload.get("rationale") or payload.get("next_experiment") or "")
     label = {"evidence": "Added evidence", "hypothesis": f"Proposed {payload.get('id', 'a hypothesis')}",
-             "candidate_set": "Shortlisted candidates", "experiment_spec": f"Chose the {payload.get('design') or payload.get('chosen') or ''} design",
+             "candidate_set": "Shortlisted candidates", "experiment_spec": _chosen_label(payload),
              "next_step": "Next step",
              "direction": f"Next round: {payload.get('mode', '')} on {', '.join(payload.get('focus_families') or [])}"}.get(kind, kind)
     return f"{label}: {str(text)[:160]}" if text else label
