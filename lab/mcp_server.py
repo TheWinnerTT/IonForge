@@ -173,11 +173,12 @@ def measurements(last_n: int = 50) -> list[dict]:
 
 @mcp.tool()
 @_tracked
-def surrogate_rank(top: int = 20, beta: float = 1.0, family: str | None = None) -> list[dict]:
+def surrogate_rank(top: int = 20, beta: float = 1.0, family: str | None = None, by: str = "ucb") -> list[dict]:
     """Fit a random-forest surrogate on measured data; rank unmeasured candidates.
 
     Returns predicted log10(sigma) (mu), uncertainty (sd), probability of being a hit
-    and UCB = mu + beta*sd. Needs at least 5 measurements.
+    and UCB = mu + beta*sd. by: "ucb" (default) or "p_hit" (most likely hits first).
+    Needs at least 5 measurements.
     """
     lab = _lab()
     if len(lab.measured) < 5:
@@ -190,7 +191,7 @@ def surrogate_rank(top: int = 20, beta: float = 1.0, family: str | None = None) 
         pool = [c for c in pool if str(pub.at[c, "family"]).lower() == family.lower()]
     if not pool:
         return []
-    sc = sur.score(pool, lab.threshold, beta).sort_values("ucb", ascending=False).head(top)
+    sc = sur.score(pool, lab.threshold, beta).sort_values("p_hit" if by == "p_hit" else "ucb", ascending=False).head(top)
     rows = {r["candidate_id"]: r for r in _public_rows(lab, list(sc.index))}
     return [{**rows[c], "mu": round(float(s.mu), 2), "sd": round(float(s.sd), 2), "p_hit": round(float(s.p_hit), 3),
              "ucb": round(float(s.ucb), 2)} for c, s in sc.iterrows()]
@@ -205,7 +206,10 @@ def evaluate_designs(designs: list[dict]) -> list[dict]:
     For each: cost, expected hits (sum of p_hit), expected learning (mean surrogate sd,
     higher = more uncertainty resolved), family diversity, and learning per unit cost.
     """
-    lab = _lab()
+    return _score_designs(_lab(), designs)
+
+
+def _score_designs(lab: Oracle, designs: list[dict]) -> list[dict]:
     ready = len(lab.measured) >= 5
     sur = None
     if ready:
@@ -309,10 +313,10 @@ def wait_for_specialists(kind: str | None = None, author: str | None = None, min
 def record_decision(kind: str, author: str, payload: dict) -> dict:
     """Append a structured decision to the shared research record.
 
-    kind: evidence | hypothesis | candidate_set | experiment_spec | review | next_step
+    kind: evidence | hypothesis | candidate_set | experiment_spec | review | direction | next_step
     payload: the typed object (e.g. a Hypothesis with id, statement, predicted effect, evidence ids).
     """
-    allowed = {"evidence", "hypothesis", "candidate_set", "experiment_spec", "review", "next_step"}
+    allowed = {"evidence", "hypothesis", "candidate_set", "experiment_spec", "review", "direction", "next_step"}
     if kind not in allowed:
         return {"error": f"kind must be one of {sorted(allowed)}"}
     if not isinstance(payload, dict) or not payload:
@@ -344,11 +348,12 @@ def _recorded(kind: str, payload: dict) -> str:
             label = "Reviewed the round"
         text = payload.get("plan_change") or payload.get("notes") or payload.get("summary") or ""
         return f"{label}. {str(text)[:160]}" if text else label
-    text = (payload.get("statement") or payload.get("trend") or payload.get("summary")
+    text = (payload.get("statement") or payload.get("trend") or payload.get("summary") or payload.get("plan_change")
             or payload.get("rationale") or payload.get("next_experiment") or "")
     label = {"evidence": "Added evidence", "hypothesis": f"Proposed {payload.get('id', 'a hypothesis')}",
              "candidate_set": "Shortlisted candidates", "experiment_spec": f"Chose the {payload.get('design') or payload.get('chosen') or ''} design",
-             "next_step": "Next step"}.get(kind, kind)
+             "next_step": "Next step",
+             "direction": f"Next round: {payload.get('mode', '')} on {', '.join(payload.get('focus_families') or [])}"}.get(kind, kind)
     return f"{label}: {str(text)[:160]}" if text else label
 
 
@@ -373,12 +378,61 @@ def _validate_decision(lab: Oracle, kind: str, author: str, payload: dict) -> st
         already = [i for i in payload["candidate_ids"] if i in lab.measured]
         if already:
             return f"already measured: {already}; choose unmeasured candidates"
+        return _check_hits(lab, payload)
+    if kind == "direction":
+        if payload.get("mode") not in ("explore", "exploit", "test"):
+            return 'direction needs mode = "explore" | "exploit" | "test"'
+        if not isinstance(payload.get("focus_families"), list) or not payload["focus_families"]:
+            return "direction needs a non-empty focus_families list"
+        if lab.round and not _critic_reviewed(lab, lab.round):
+            return f"round {lab.round} has no critic review yet: the direction must follow the critic"
+        if payload["mode"] != "exploit" and lab.remaining <= lab.budget / 2:
+            return ("the second half of the budget is for hits: mode must be \"exploit\" (focus on the "
+                    "families of the highest-p_hit candidates)")
     if kind == "next_step":
         if lab.remaining >= lab.cost_per_measurement:
             return ("next_step is only for the end of the campaign (budget not spent yet); "
                     "finish the round with your 3-line summary instead")
         if lab.round and not _critic_reviewed(lab, lab.round):
             return f"round {lab.round} has no critic review yet: dispatch the critic and wait for it first"
+        text = " ".join(str(payload.get(k) or "") for k in ("learned", "uncertain", "next_experiment"))
+        if "placeholder" in text.lower() or len(text) < 60:
+            return "next_step needs the real content of learned, uncertain and next_experiment (no placeholders)"
+        best = payload.get("best_candidates") or []
+        if not best or any(c not in lab.measured for c in best):
+            return "best_candidates must list measured candidate ids, best first"
+    return None
+
+
+# The lab is judged on measurements-to-hits, so a batch must not give up expected hits
+# lightly: choosing a design with clearly fewer expected hits than the best alternative
+# needs a stated reason ("why_fewer_hits"), and is refused outright in the second half of
+# the budget. Scores are recomputed here, never taken from the agent's payload.
+HITS_SLACK = 0.7          # chosen may have 70% of the best design's expected hits
+MIN_HITS_GAP = 0.05       # ignore differences smaller than this (in expected hits)
+
+
+def _check_hits(lab: Oracle, payload: dict) -> str | None:
+    designs = [d for d in payload.get("designs") or [] if isinstance(d, dict) and d.get("candidate_ids")]
+    if not designs:
+        return None
+    scored = _score_designs(lab, [{"name": "chosen", "candidate_ids": payload["candidate_ids"]}] + designs)
+    key = "expected_hits" if "expected_hits" in scored[0] else "prior_score"
+    if key not in scored[0]:
+        return None  # anonymized lab before the surrogate: nothing to compare
+    chosen, best = scored[0], max(scored[1:], key=lambda r: r.get(key, 0))
+    gap = best.get(key, 0) - chosen.get(key, 0)
+    if key == "expected_hits" and (gap < MIN_HITS_GAP or chosen[key] >= HITS_SLACK * best[key]):
+        return None
+    if key == "prior_score" and gap < 0.1:
+        return None
+    what = f"{key} {chosen.get(key)} vs {best.get(key)} for design '{best['name']}'"
+    if lab.remaining <= lab.budget / 2:
+        return (f"the chosen batch gives up expected hits ({what}) in the second half of the budget: "
+                f"choose the design with the most expected hits")
+    if len(str(payload.get("why_fewer_hits") or "")) < 40:
+        return (f"the chosen batch gives up expected hits ({what}): choose that design, or add "
+                f"'why_fewer_hits' (>= 40 chars) saying what this batch learns that is worth the hits")
     return None
 
 

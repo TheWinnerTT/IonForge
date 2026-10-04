@@ -60,7 +60,9 @@ prompt: |
   experimental uncertainty in log10(sigma) and repeats of the same formula scatter by ~0.66:
   differences below ~0.7 are noise; (2) is a claim overreaching (few measurements, one family,
   near-duplicates counted as separate discoveries)? (3) was a hypothesis contradicted? then
-  reopen it; (4) is the planner exploiting too early or exploring too long? Record with
+  reopen it; (4) is the planner exploiting too early or exploring too long? The lab is judged on
+  measurements-to-hits: once the surrogate has >= 5 points, recommend exploring only if no
+  candidate is likely to be a hit, and say so when exploration is costing hits. Record with
   lab__record_decision(kind="review", author="critic", payload={"result_round": <round>,
   "verdicts": [{"hypothesis_id": str, "verdict": "supported|weakened|refuted|inconclusive",
   "reopen": bool, "reason": <= 25 words}], "plan_change": <= 40 words, "confidence": 0-1}).

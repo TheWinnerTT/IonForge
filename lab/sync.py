@@ -24,6 +24,7 @@ EVENT_KIND = {
     "candidate_set": "candidates",
     "experiment_spec": "plan",
     "review": "review",
+    "direction": "direction",
     "next_step": "next_step",
 }
 HYPOTHESIS_STATUS = {"new": "open", "revised": "open", "reopened": "reopened"}
@@ -97,6 +98,9 @@ def decision(run_id: str, round_: int, kind: str, author: str, payload: dict[str
     elif kind == "candidate_set":
         cands = payload.get("candidates", [])
         summary = f"{len(cands)} candidates for {payload.get('hypothesis_id')}"
+    elif kind == "direction":
+        summary = (f"Next round: {payload.get('mode')} on {', '.join(payload.get('focus_families') or [])}. "
+                   f"{payload.get('plan_change') or ''}")
     elif kind == "evidence":
         summary = payload.get("claim") or payload.get("trend") or "evidence card"
     else:

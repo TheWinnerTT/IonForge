@@ -32,7 +32,7 @@ Return only JSON:
 
 
 def critic(round_record, model=None):
-    model = model or os.getenv("CRITIC_MODEL", "anthropic/claude-sonnet-5.5")
+    model = model or os.getenv("CRITIC_MODEL", "google/gemini-3.8-flash")
     # The Hypothesis Generator runs on Mistral, so the Critic must not.
     if "mistral" in model.lower():
         raise ValueError("The Critic must use a different model family from the Mistral Hypothesis Generator")

@@ -6,8 +6,8 @@ environment variable (`env:VAR`) that `make` loads from .env at launch.
 
   mistral_demo          MISTRAL_API_KEY               lab agents: live demo, rehearsals, smoke tests
   mistral_campaigns     MISTRAL_API_KEY_CAMPAIGNS     lab agents: overnight campaigns and ablations
-  openrouter_demo       OPENROUTER_API_KEY            Critic (Claude): live demo, rehearsals, smoke tests
-  openrouter_campaigns  OPENROUTER_API_KEY_CAMPAIGNS  Critic (Claude): overnight campaigns and ablations
+  openrouter_demo       OPENROUTER_API_KEY            Critic (Gemini): live demo, rehearsals, smoke tests
+  openrouter_campaigns  OPENROUTER_API_KEY_CAMPAIGNS  Critic (Gemini): overnight campaigns and ablations
 
 Every agent runs on the openai-agents harness (lean prompt, no Claude Code system
 prompt). OpenRouter and Mistral speak Chat Completions, not the OpenAI Responses API, so the
