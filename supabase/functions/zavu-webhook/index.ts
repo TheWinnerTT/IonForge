@@ -63,7 +63,8 @@ Deno.serve(async (req) => {
   if (id === null) return new Response("nothing pending");
 
   const { error } = await supabase.from("approvals")
-    .update({ status, channel: "whatsapp", decided_by: from, decided_at: new Date().toISOString() })
+    // Never store the phone number: approvals is publicly readable by the dashboard.
+    .update({ status, channel: "whatsapp", decided_by: "scientist (WhatsApp)", decided_at: new Date().toISOString() })
     .eq("id", id).eq("status", "pending");
   if (error) return new Response(error.message, { status: 500 });
   return new Response(`approval ${id} ${status}`);
