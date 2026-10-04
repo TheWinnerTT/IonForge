@@ -168,6 +168,16 @@ def agent_config(kb_id: str) -> dict:
                 "expand_text": "Ask the lab", "listening_text": "Listening…", "speaking_text": "The lab is answering",
                 "transcript_enabled": True, "text_input_enabled": True, "disable_banner": True,
                 "show_conversation_id": False,
+                # current widget versions read these instead of the flat *_text fields
+                "text_contents": {"main_label": "Ask the lab", "start_call": "Ask a question", "end_call": "End",
+                                  "new_call": "Ask again", "listening_status": "Listening…",
+                                  "speaking_status": "The lab is answering", "connecting_status": "Connecting…",
+                                  "input_placeholder": "Type a question for the lab"},
+                "styles": {"base": "#0B0F14", "base_hover": "#111821", "base_active": "#16202B",
+                           "base_border": "#1F2933", "base_subtle": "#8B98A5", "base_primary": "#E6EDF3",
+                           "accent": "#0D6A88", "accent_hover": "#0F7C9E", "accent_active": "#0B5C76",
+                           "accent_border": "#0D6A88", "accent_subtle": "#CDEBF4", "accent_primary": "#FFFFFF",
+                           "button_radius": 999},
             },
         },
     }
